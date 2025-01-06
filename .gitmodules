@@ -1,0 +1,3 @@
+[submodule "controller/lib/MPU-9250_Breakout"]
+	path = controller/lib/MPU-9250_Breakout
+	url = https://github.com/eliteio/MPU-9250_Breakout.git

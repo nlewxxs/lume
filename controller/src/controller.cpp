@@ -8,6 +8,11 @@
 
 // Include Particle Device OS APIs
 #include "Particle.h"
+#include "../lib/MPU-9250_Breakout/Libraries/Arduino/src/MPU9250.h"
+
+#define AHRS true  // enable filtering and fusion. Think this is the same as the DMP? not sure yet. 
+
+MPU9250 mpu; // MPU9250 object definition
 
 // Let Device OS manage the connection to the Particle Cloud
 SYSTEM_MODE(AUTOMATIC);

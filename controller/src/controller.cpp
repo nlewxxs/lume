@@ -52,19 +52,6 @@ void setup() {
         // Start by performing self test and reporting values
         mpu.MPU9250SelfTest(mpu.SelfTest);
 
-        /* Log.info("x-axis self test: acceleration trim within : ");
-        Log.info("%f", mpu.SelfTest[0]);
-        Log.info("y-axis self test: acceleration trim within : ");
-        Log.info("%f", mpu.SelfTest[1]); 
-        Log.info("z-axis self test: acceleration trim within : ");
-        Log.info("%f", mpu.SelfTest[2]);
-        Log.info("x-axis self test: gyration trim within : ");
-        Log.info("%f", mpu.SelfTest[3]); 
-        Log.info("y-axis self test: gyration trim within : ");
-        Log.info("%f", mpu.SelfTest[4]); 
-        Log.info("z-axis self test: gyration trim within : ");
-        Log.info("%f", mpu.SelfTest[5]);  */
-
         // Calibrate gyro and accelerometers, load biases in bias registers
         mpu.calibrateMPU9250(mpu.gyroBias, mpu.accelBias);
         mpu.initMPU9250();
@@ -121,6 +108,8 @@ void loop() {
     mpu.magbias[1] = +120.;
     // User environmental x-axis correction in milliGauss
     mpu.magbias[2] = +125.;
+
+    //compute
 
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental

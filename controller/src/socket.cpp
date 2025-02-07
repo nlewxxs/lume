@@ -1,7 +1,7 @@
-#include "ArduinoJson/Document/JsonDocument.hpp"
+#include "ArduinoJson-v7.3.0.h"
 #include "Particle.h"
 #include "socket.hpp"
-#include "ArduinoJson.hpp"
+#include "ArduinoJson.h"
 #include <string>
 
 namespace {
@@ -27,17 +27,6 @@ std::variant<int, ErrorCode> ListenForServerConn() {
         if (packet_size) {
             int len = udp.read(recv_buffer, sizeof(recv_buffer) - 1);
             recv_buffer[len] = '\0'; // null termination
-                                     //
-            Log.info("Received JSON: %s", recv_buffer);
-
-            if (false) {
-                Log.warn("JSON Parsing failed!");
-            } else {
-                // Store the server IP if the JSON has been reconstructed correctly
-                server_ip = udp.remoteIP();
-                // Update all the other params
-                // const char* tcp_client_port = json_doc["tcp_client_port"];
-            }
         }
         attempts++;
     }

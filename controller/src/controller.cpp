@@ -7,34 +7,30 @@
  */
 
 #include "Particle.h"
-#include "sensors.h"
+#include "sensors.hpp"
 #include <climits>
 #include <cstring>
 #include <variant>
 
 // Let Device OS manage the connection to the Particle Cloud
 SYSTEM_MODE(AUTOMATIC);
-
 // Run the application and system concurrently in separate threads
 SYSTEM_THREAD(ENABLED);
-
-// UDP Udp;
-// unsigned int rx_port = 8888;
-// unsigned int tx_port = 8889;
-
-static float pitch;
-static float roll;
-static float yaw;
-
 // Show system, cloud connectivity, and application logs over USB
 // View logs with CLI using 'particle serial monitor --follow'
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
+namespace {
+// Keep track of the pitch, roll and yaw as globals in an anonymous namespace
+static float pitch;
+static float roll;
+static float yaw;
+}
+
+
 void setup() {
 
     Serial.begin(9600);
-    Wire.begin();
-    // Udp.begin(rx_port);
 
     // Attempt MPU9250 initialisation
     std::variant<int, sensors::ErrorCode> init_res;

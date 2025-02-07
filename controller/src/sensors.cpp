@@ -1,4 +1,4 @@
-#include "sensors.h"
+#include "sensors.hpp"
 
 namespace {
 
@@ -10,15 +10,17 @@ static constexpr int SUCCESS = 0;
 
 }
 
-using error = sensors::ErrorCode;
+namespace sensors {
 
-std::variant<int, error> sensors::InitMPU9250() {
+std::variant<int, ErrorCode> InitMPU9250() {
+
+    Wire.begin();
 
     // Get the address of the MPU9250 and make sure it is as expected
     address = mpu.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
     
     // Break early if MPU cannot be found at the right address
-    if (address != MPU_EXPECTED_ADDRESS) return error::MpuNotFound;
+    if (address != MPU_EXPECTED_ADDRESS) return ErrorCode::MpuNotFound;
 
     else {
 
@@ -35,10 +37,10 @@ std::variant<int, error> sensors::InitMPU9250() {
     return SUCCESS;
 }
 
-std::variant<int, error> sensors::UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {
+std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {
 
     // Break early if uninitialised
-    if (!initialised) return error::MpuUninitialised;
+    if (!initialised) return ErrorCode::MpuUninitialised;
 
     mpu.readAccelData(mpu.accelCount);  // Read the x/y/z adc values
     mpu.getAres();
@@ -120,3 +122,5 @@ std::variant<int, error> sensors::UpdateMPU9250Readings(float* pitch, float* rol
 
     return SUCCESS;
 }
+
+} /* namespace socket */ 

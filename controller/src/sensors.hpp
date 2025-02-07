@@ -1,3 +1,6 @@
+#ifndef SENSORS_H_
+#define SENSORS_H_
+
 #include "Particle.h"
 #include "MPU9250.h"
 #include "quaternionFilters.h"
@@ -22,3 +25,5 @@ std::variant<int, ErrorCode> InitMPU9250(void);
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw);
 
 } /* namespace sensors */
+
+#endif /* SENSORS_H_ */

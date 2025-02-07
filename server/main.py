@@ -2,7 +2,7 @@
 
 import socket
 
-udp_ip = "192.168.35.65"
+udp_ip = "192.168.96.65"
 port = 8888
 msg = b"hello world"
 

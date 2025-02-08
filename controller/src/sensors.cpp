@@ -109,9 +109,6 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     //
     mpu.yaw   -= 8.5;
 
-    Log.info("Yaw: %f, Pitch: %f, Roll: %f", mpu.yaw, mpu.pitch, mpu.roll);
-    Log.info("rate = %f Hz", (float)mpu.sumCount/mpu.sum);
-
     *pitch = mpu.pitch;
     *roll = mpu.roll;
     *yaw = mpu.yaw;

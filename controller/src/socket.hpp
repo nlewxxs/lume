@@ -2,6 +2,7 @@
 #define SOCKET_H_
 
 #include "Particle.h"
+#include "spark_wiring_ipaddress.h"
 #include <variant>
 
 
@@ -11,7 +12,11 @@ enum class ErrorCode {
     NoServerConn 
 };
 
-std::variant<int, ErrorCode> InitServerConn();
+void InitSockets();
+
+std::variant<int, ErrorCode> ListenForServerConn();
+
+std::variant<IPAddress, ErrorCode> GetServerIP();
 
 } /* namespace socket */
 #endif /* SOCKET_H_ */

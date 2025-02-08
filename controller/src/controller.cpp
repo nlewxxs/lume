@@ -41,6 +41,7 @@ void setup() {
         delay(500);
     }
 
+
     socket::InitSockets();
     bool initialised = false;
 
@@ -95,20 +96,21 @@ void setup() {
 
 void loop() {
 
-    if (millis() - lastUpdate > 10) {
-        std::variant<int, sensors::ErrorCode> read_res;
-        read_res = sensors::UpdateMPU9250Readings(&pitch, &roll, &yaw);
-
-        if (std::holds_alternative<int>(read_res)) {
-            // bueno
-            Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
-        } else {
-            Log.error("Failed to read from MPU!");
-        }
-
-        lastUpdate = millis();
+    std::variant<int, sensors::ErrorCode> read_res;
+    read_res = sensors::UpdateMPU9250Readings(&pitch, &roll, &yaw);
+    if (std::holds_alternative<int>(read_res)) {
+        // bueno
+        Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
+    } else {
+        Log.error("Failed to read from MPU!");
     }
- 
-    // Handle background callbacks (i.e. cloud conn)
-    Particle.process();
+
+    if (millis() - lastUpdate > 5000) {
+        Particle.publish("Ping");
+        lastUpdate = millis();
+        // Handle background callbacks (i.e. cloud conn)
+        Particle.process();
+    }
+
+    delay(5);
 } 

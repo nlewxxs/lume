@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 import struct
+import keyboard
 from typing import Tuple, Optional, List
 
 try:
@@ -193,8 +194,12 @@ class UDPServer:
                         self.logger.warning("Connection lost, returning to polling mode")
                         break
                     
+                    recording = keyboard.is_pressed("space")
+                    log_colour = Fore.MAGENTA if recording else Fore.WHITE
+
                     values, addr = result
-                    self.logger.debug(f"Received values {values} from {addr}")
+                    self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
+
                     
                     # Process the 6 float values here as needed
                     # This is where you would add your application logic
@@ -205,7 +210,6 @@ class UDPServer:
             if hasattr(self, 'sock') and self.sock:
                 self.sock.close()
                 self.logger.info("Socket closed")
-
 
 def parse_arguments():
     """Parse command line arguments."""

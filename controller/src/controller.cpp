@@ -1,6 +1,6 @@
 /* 
- * Project myProject
- * Author: Your Name
+ * Project Lume
+ * Author: Nik Lewis
  * Date: 
  * For comprehensive documentation and examples, please visit:
  * https://docs.particle.io/firmware/best-practices/firmware-template/

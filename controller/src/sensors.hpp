@@ -21,7 +21,10 @@ enum class ErrorCode {
 // Initialise the sensor
 std::variant<int, ErrorCode> InitMPU9250(void);
 
-// Update the readings
+// Update the flex sensor readings
+void UpdateFlexSensors(float* flex0, float* flex1, float* flex2);
+
+// Update the IMU readings
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw);
 
 } /* namespace sensors */

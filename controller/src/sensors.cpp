@@ -1,13 +1,17 @@
+#include "Particle.h"
+#include "spark_wiring.h"
 #include "sensors.hpp"
 
 namespace {
-
 byte MPU_EXPECTED_ADDRESS = 0x70;
 MPU9250 mpu; // MPU9250 object definition
 byte address = 0x00;
 bool initialised = false;
 static constexpr int SUCCESS = 0;
-
+// Define flex sensors
+static constexpr int FLEX0PIN = A0;
+static constexpr int FLEX1PIN = A2; // yes I soldered them wrong
+static constexpr int FLEX2PIN = A1;
 }
 
 namespace sensors {
@@ -37,6 +41,12 @@ std::variant<int, ErrorCode> InitMPU9250() {
     return SUCCESS;
 }
 
+void UpdateFlexSensors(float* flex0, float* flex1, float* flex2) {
+    *flex0 = static_cast<float>(analogRead(FLEX0PIN));
+    *flex1 = static_cast<float>(analogRead(FLEX1PIN));
+    *flex2 = static_cast<float>(analogRead(FLEX2PIN));
+}
+
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {
 
     // Break early if uninitialised
@@ -46,7 +56,7 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     mpu.getAres();
 
     mpu.ax = (float)mpu.accelCount[0]*mpu.aRes; // - accelBias[0];
-    mpu.ay = (float)mpu.accelCount[1]*mpu.aRes; // - accelBias[1];
+    mpu.ay = (float)mpu.accelCount[0]*mpu.aRes; // - accelBias[1];
     mpu.az = (float)mpu.accelCount[2]*mpu.aRes; // - accelBias[2];
 
     mpu.readGyroData(mpu.gyroCount);  // Read the x/y/z adc values

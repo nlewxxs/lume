@@ -30,6 +30,9 @@ namespace {
 static float pitch;
 static float roll;
 static float yaw;
+static float flex0; // thumb
+static float flex1; // index
+static float flex2; // ring
 static unsigned long lastUpdate = 0;
 }
 
@@ -99,12 +102,21 @@ void setup() {
 
 void loop() {
 
+    // We optimistically assume that nothing can go wrong with flex sensors
+    // apart from a physical wiring issue
+    sensors::UpdateFlexSensors(&flex0, &flex1, &flex2);
+
+    // Attempt to update the MPU readings
     std::variant<int, sensors::ErrorCode> read_res;
     read_res = sensors::UpdateMPU9250Readings(&pitch, &roll, &yaw);
+
+    // handle errors 
     if (std::holds_alternative<int>(read_res)) {
         // bueno
-        std::array<float, 6> readings = {pitch, roll, yaw, 0.00, 0.00, 0.00};
+        std::array<float, 6> readings = {pitch, roll, yaw, flex0, flex1, flex2};
         socket::SendSensorReadings(readings);
+        // Only attempt print if completely necessary, this slows down the loop
+        // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
     } else {
         Log.error("Failed to read from MPU!");

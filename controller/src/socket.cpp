@@ -1,5 +1,7 @@
 #include "Particle.h"
 #include "socket.hpp"
+#include <iomanip>
+#include <sstream>
 #include <string>
 
 namespace {
@@ -13,6 +15,7 @@ static constexpr int kMaxAttempts = 100;
 static char recv_buffer[128];
 static std::optional<IPAddress> server_ip;
 static constexpr int SUCCESS = 0;
+static char readings_buffer[100];
 }
 
 namespace socket {
@@ -48,6 +51,28 @@ std::variant<int, ErrorCode> ListenForServerConn() {
 std::variant<IPAddress, ErrorCode> GetServerIP() {
     if (server_ip.has_value()) return server_ip.value();
     else return ErrorCode::NoServerConn;
+}
+
+std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 6>& readings) {
+    // If the server IP has not been initialised, return error code
+    if (!server_ip.has_value()) return ErrorCode::SendingBeforeInit; 
+    
+    // Convert floats to a string
+    uint8_t buffer[24];
+
+    for (int i = 0; i < 6; i++) {
+        // Convert float to 4 bytes in network byte order (big-endian)
+        uint32_t floatBits;
+        memcpy(&floatBits, &readings[i], 4);
+        // Copy the bytes to the buffer
+        memcpy(&buffer[i*4], &floatBits, 4);
+    }
+
+    udp.beginPacket(server_ip.value(), kUdpPort);
+    udp.write(buffer, sizeof(buffer));
+    udp.endPacket();
+
+    return SUCCESS;
 }
 
 } /* namespace socket */

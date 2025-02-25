@@ -9,7 +9,8 @@
 namespace socket {
 
 enum class ErrorCode {
-    NoServerConn 
+    NoServerConn,
+    SendingBeforeInit,
 };
 
 void InitSockets();
@@ -17,6 +18,8 @@ void InitSockets();
 std::variant<int, ErrorCode> ListenForServerConn();
 
 std::variant<IPAddress, ErrorCode> GetServerIP();
+
+std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 6>& readings);
 
 } /* namespace socket */
 #endif /* SOCKET_H_ */

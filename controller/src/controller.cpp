@@ -10,6 +10,7 @@
 #include "sensors.hpp"
 #include "socket.hpp"
 #include "spark_wiring_ipaddress.h"
+#include "wlan_hal.h"
 #include <climits>
 #include <cstring>
 #include <variant>
@@ -21,6 +22,8 @@ SYSTEM_THREAD(ENABLED);
 // Show system, cloud connectivity, and application logs over USB
 // View logs with CLI using 'particle serial monitor --follow'
 SerialLogHandler logHandler(LOG_LEVEL_INFO);
+// Select the external antenna
+STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
 
 namespace {
 // Keep track of the pitch, roll and yaw as globals in an anonymous namespace
@@ -100,7 +103,9 @@ void loop() {
     read_res = sensors::UpdateMPU9250Readings(&pitch, &roll, &yaw);
     if (std::holds_alternative<int>(read_res)) {
         // bueno
-        Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
+        std::array<float, 6> readings = {pitch, roll, yaw, 0.00, 0.00, 0.00};
+        socket::SendSensorReadings(readings);
+        // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
     } else {
         Log.error("Failed to read from MPU!");
     }

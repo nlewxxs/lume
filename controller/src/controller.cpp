@@ -30,9 +30,9 @@ namespace {
 static float pitch;
 static float roll;
 static float yaw;
-static float flex0; // thumb
-static float flex1; // index
-static float flex2; // ring
+static int32_t flex0; // thumb
+static int32_t flex1; // index
+static int32_t flex2; // ring
 static unsigned long lastUpdate = 0;
 }
 
@@ -113,8 +113,9 @@ void loop() {
     // handle errors 
     if (std::holds_alternative<int>(read_res)) {
         // bueno
-        std::array<float, 6> readings = {pitch, roll, yaw, flex0, flex1, flex2};
-        socket::SendSensorReadings(readings);
+        std::array<float, 3> imu_readings = {pitch, roll, yaw};
+        std::array<int32_t, 3> flex_readings = {flex0, flex1, flex2};
+        socket::SendSensorReadings(imu_readings, flex_readings);
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);

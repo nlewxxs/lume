@@ -19,7 +19,7 @@ std::variant<int, ErrorCode> ListenForServerConn();
 
 std::variant<IPAddress, ErrorCode> GetServerIP();
 
-std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 6>& readings);
+std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 3>& imu_readings, std::array<int32_t, 3>& flex_readings);
 
 } /* namespace socket */
 #endif /* SOCKET_H_ */

@@ -53,19 +53,31 @@ std::variant<IPAddress, ErrorCode> GetServerIP() {
     else return ErrorCode::NoServerConn;
 }
 
-std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 6>& readings) {
+std::variant<int, ErrorCode>
+SendSensorReadings(std::array<float, 3> &imu_readings,
+                   std::array<int32_t, 3> &flex_readings) {
+
     // If the server IP has not been initialised, return error code
-    if (!server_ip.has_value()) return ErrorCode::SendingBeforeInit; 
-    
+    if (!server_ip.has_value()) return ErrorCode::SendingBeforeInit;
+
     // Convert floats to a string
     uint8_t buffer[24];
 
-    for (int i = 0; i < 6; i++) {
+    // Copy in the IMU readings
+    for (int i = 0; i < 3; i++) {
         // Convert float to 4 bytes in network byte order (big-endian)
         uint32_t floatBits;
-        memcpy(&floatBits, &readings[i], 4);
+        memcpy(&floatBits, &imu_readings[i], 4);
         // Copy the bytes to the buffer
-        memcpy(&buffer[i*4], &floatBits, 4);
+        memcpy(&buffer[i * 4], &floatBits, 4);
+    }
+
+    // Copy in the Flex sensor readings
+    for (int i = 0; i < 3; i++) {
+        uint32_t intBits;
+        memcpy(&intBits, &flex_readings[i], 4);
+        // Copy the bytes to the buffer
+        memcpy(&buffer[(i + 3) * 4], &intBits, 4);
     }
 
     udp.beginPacket(server_ip.value(), kUdpPort);

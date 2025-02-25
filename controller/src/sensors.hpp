@@ -22,7 +22,7 @@ enum class ErrorCode {
 std::variant<int, ErrorCode> InitMPU9250(void);
 
 // Update the flex sensor readings
-void UpdateFlexSensors(float* flex0, float* flex1, float* flex2);
+void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2);
 
 // Update the IMU readings
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw);

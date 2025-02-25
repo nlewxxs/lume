@@ -108,11 +108,11 @@ class UDPServer:
         
         if len(data) == expected_size:
             # Unpack 6 floats (IEEE 754 format, network byte order)
-            return list(struct.unpack('<6f', data))
+            return list(struct.unpack('<3f3i', data))
         elif len(data) > expected_size:
             self.logger.warning(f"Received more data than expected: {len(data)} bytes")
             # Still try to parse the first 6 floats
-            return list(struct.unpack('<6f', data[:expected_size]))
+            return list(struct.unpack('<3f3i', data[:expected_size]))
         else:
             self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {expected_size}")
             return []

@@ -41,10 +41,10 @@ std::variant<int, ErrorCode> InitMPU9250() {
     return SUCCESS;
 }
 
-void UpdateFlexSensors(float* flex0, float* flex1, float* flex2) {
-    *flex0 = static_cast<float>(analogRead(FLEX0PIN));
-    *flex1 = static_cast<float>(analogRead(FLEX1PIN));
-    *flex2 = static_cast<float>(analogRead(FLEX2PIN));
+void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2) {
+    *flex0 = analogRead(FLEX0PIN);
+    *flex1 = analogRead(FLEX1PIN);
+    *flex2 = analogRead(FLEX2PIN);
 }
 
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {

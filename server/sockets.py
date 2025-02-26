@@ -200,7 +200,7 @@ class UDPServer:
                     recording = keyboard.is_pressed("space")
                     log_colour = Fore.MAGENTA if recording else Fore.WHITE
 
-                    values, addr = result
+                    values, _ = result
 
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
                     

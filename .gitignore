@@ -1,4 +1,5 @@
 *.bin
 compile_flags.txt
 .vscode/
+__pycache__/
 

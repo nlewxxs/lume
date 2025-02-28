@@ -1,7 +1,9 @@
+from sys import implementation
 import redis
 import sockets
 import argparse
 
+from training_db import TrainingDatabase
 from config import ENV
 
 def parse_arguments():
@@ -38,12 +40,12 @@ def parse_arguments():
         default="deploy",
         help="Define the server runtime mode.  \
             Choose between < data > (for data collection) and < deploy > for \
-            deployment mode. Default is 'deploy'."
+            deployment mode, < training > for training the model. Default is 'deploy'."
     )
     parser.add_argument(
         "--user",
-        type=int,
-        default=0,
+        type=str,
+        default='nl621',
         help="Unique UID corresponding to the current user. Defaults to 0."
     )
     return parser.parse_args()
@@ -67,8 +69,15 @@ if __name__ == "__main__":
     # Set the environmental variables in Redis
     set_env_vars(redisconn, args)
 
-    # Startup an endpoint
+    # Startup a server
     server = sockets.LumeServer(port=args.port, redisconn=redisconn, \
-                                 config=ENV, verbose=args.verbose)
+                                 verbose=args.verbose)
+
     # Run the server
-    server.run(args.ip, args.polling_interval)
+    # server.run(args.ip, args.polling_interval)
+
+    # Init the database
+    db = None  # this will become the influx DB when training
+    if args.mode == "data":
+        db = TrainingDatabase(user=args.user, redisconn=redisconn, verbose=args.verbose)
+

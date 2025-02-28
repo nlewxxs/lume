@@ -10,46 +10,16 @@ import sys
 import struct
 import keyboard
 import redis
+
+from config import ENV
+from lume_logger import *
 from typing import Tuple, Optional, List, Dict
-
-try:
-    from colorama import init, Fore, Style
-    init(autoreset=True)
-    COLORS_AVAILABLE = True
-except ImportError:
-    COLORS_AVAILABLE = False
-    
-    class DummyFore:
-        GREEN = YELLOW = RED = WHITE = CYAN = BLUE = MAGENTA = ""
-    
-    class DummyStyle:
-        BRIGHT = RESET_ALL = ""
-    
-    Fore = DummyFore()
-    Style = DummyStyle()
-
-
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter for colored console logs."""
-    
-    FORMATS = {
-        logging.DEBUG: Fore.BLUE + "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
-        logging.INFO: Fore.WHITE + "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
-        logging.WARNING: Fore.YELLOW + "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
-        logging.ERROR: Fore.RED + "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL,
-        logging.CRITICAL: Fore.RED + Style.BRIGHT + "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
 
 
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
-    def __init__(self, redisconn: redis.client.Redis, config: Dict, port: int = 8888, verbose: bool = False):
+    def __init__(self, redisconn: redis.client.Redis, port: int = 8888, verbose: bool = False):
         """Initialize the UDP server.
         
         Args:
@@ -59,10 +29,10 @@ class LumeServer:
         self.port = port
 
         self.redisconn = redisconn
-        self.config = config
+        self.config = ENV
 
         # Extract the run mode straight away
-        self.mode = redisconn.get(config["redis_mode_variable"])
+        self.mode = redisconn.get(ENV["redis_mode_variable"])
         
         # Setup logging with color
         self._setup_colored_logging(verbose)

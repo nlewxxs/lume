@@ -10,7 +10,7 @@ import sys
 import struct
 import keyboard
 import redis
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict
 
 try:
     from colorama import init, Fore, Style
@@ -46,10 +46,10 @@ class ColoredFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-class UDPServer:
+class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
-    def __init__(self, redisconn: redis.client.Redis, redis_channel: str, port: int = 8888, verbose: bool = False):
+    def __init__(self, redisconn: redis.client.Redis, config: Dict, port: int = 8888, verbose: bool = False):
         """Initialize the UDP server.
         
         Args:
@@ -59,7 +59,10 @@ class UDPServer:
         self.port = port
 
         self.redisconn = redisconn
-        self.redis_channel = redis_channel
+        self.config = config
+
+        # Extract the run mode straight away
+        self.mode = redisconn.get(config["redis_mode_variable"])
         
         # Setup logging with color
         self._setup_colored_logging(verbose)
@@ -201,12 +204,17 @@ class UDPServer:
                     log_colour = Fore.MAGENTA if recording else Fore.WHITE
 
                     values, _ = result
+                    
+                    # Print as info if collecting data (so always shows up)
+                    if self.mode == "data" and recording:
+                        self.logger.info(f"{log_colour}Received values {values} {Style.RESET_ALL}")
+                    # Otherwise keep this as debug
+                    else:
+                        self.logger.debug(f"Received values {values}")
 
-                    self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
                     
                     # Publish to the specified redis channel
-                    # TODO: convert to json probably
-                    self.redisconn.publish(self.redis_channel, str(values))
+                    self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
                         
         except KeyboardInterrupt:
             self.logger.warning("Received keyboard interrupt, shutting down...")

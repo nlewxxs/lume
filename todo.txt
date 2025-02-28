@@ -1,0 +1,3 @@
+move all env stuff to an .env file
+separate queries into %s form instead of f strings. 
+dockerise!

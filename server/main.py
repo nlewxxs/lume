@@ -6,6 +6,9 @@ import argparse
 from training_db import TrainingDatabase
 from config import ENV
 
+ORANGE = "\033[38;5;208m"  # 208 is a nice orange
+RESET = "\033[0m"  # ANSI reset escape sequence
+
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -42,21 +45,15 @@ def parse_arguments():
             Choose between < data > (for data collection) and < deploy > for \
             deployment mode, < training > for training the model. Default is 'deploy'."
     )
-    parser.add_argument(
-        "--user",
-        type=str,
-        default='nl621',
-        help="Unique UID corresponding to the current user. Defaults to 0."
-    )
     return parser.parse_args()
 
 
-def set_env_vars(redisconn: redis.client.Redis, args):
+def set_env_vars(redisconn: redis.client.Redis, args, shortcode: str):
     """Set the environmental variables needed to be stored in Redis"""
     # Mode in which the server is started
     redisconn.set(ENV['redis_mode_variable'], args.mode)
     # The current user
-    redisconn.set(ENV['redis_uid_variable'], args.user)
+    redisconn.set(ENV['redis_uid_variable'], shortcode)
 
 
 if __name__ == "__main__":
@@ -66,18 +63,27 @@ if __name__ == "__main__":
     # Configure redis instance
     redisconn = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
-    # Set the environmental variables in Redis
-    set_env_vars(redisconn, args)
+    # Request the current user's name
+    name = input(f"{ORANGE}Please enter your imperial shortcode: {RESET}")
 
-    # Startup a server
-    server = sockets.LumeServer(port=args.port, redisconn=redisconn, \
+    # testing purposes: TODO remove
+    shortcode = 'nl621' if name is None else name 
+
+    # Set the environmental variables in Redis
+    set_env_vars(redisconn, args, shortcode)
+
+    # Startup a udp endpoint
+    endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, \
                                  verbose=args.verbose)
 
     # Run the server
-    # server.run(args.ip, args.polling_interval)
+    # endpoint.run(args.ip, args.polling_interval)
 
-    # Init the database
-    db = None  # this will become the influx DB when training
+    db = None  # this will become the influx DB when deployed
+
+    # OPTION 1 - Data collection mode
     if args.mode == "data":
-        db = TrainingDatabase(user=args.user, redisconn=redisconn, verbose=args.verbose)
+
+        # Init the database
+        db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
 

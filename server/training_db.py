@@ -8,6 +8,7 @@ from lume_logger import *
 from config import ENV
 
 USERS_TABLE = "users"
+GESTURES_TABLE = "gestures"
 
 class TrainingDatabase:
 
@@ -30,13 +31,13 @@ class TrainingDatabase:
         # Setup coloured logging
         self._setup_colored_logging(verbose)
     
-        # Check if the table exists: 
+        # Check if the USERS table exists: 
         if not self.table_exists(USERS_TABLE):
             # Warn if not
             self.logger.info(f"{Fore.CYAN}USERS TABLE HAS NOT BEEN FOUND - CREATING NEW ONE." \
                     f" If you did not expect this then ensure the database is accessible.{Style.RESET_ALL}")
 
-            # Create the table
+            # Create the table if not
             self.cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {USERS_TABLE}(
                 id TEXT PRIMARY KEY
@@ -47,6 +48,33 @@ class TrainingDatabase:
         if not self.user_exists(user):
             self.logger.info(f"{Fore.CYAN}USER {user} DOES NOT EXIST. Creating new entry.{Style.RESET_ALL}")
             self.insert_user(user)
+
+        # Check if the GESTURES table exists:
+        if not self.table_exists(GESTURES_TABLE):
+            # Warn if not
+            self.logger.info(f"{Fore.CYAN}GESTURES TABLE HAS NOT BEEN FOUND - CREATING NEW ONE." \
+                    f" If you did not expect this then ensure the database is accessible.{Style.RESET_ALL}")
+
+            # Define the gestures enum type if it does not already exist
+            self.cursor.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gesture_type') THEN
+                    CREATE TYPE gesture_type AS ENUM ('takeoff', 'land', 'action_1', 'action_2', 'action_3');
+                END IF;
+            END $$
+            """)
+
+            # Create the table if not found
+            self.cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS {GESTURES_TABLE}(
+                id SERIAL PRIMARY KEY,
+                gesture gesture_type,
+                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB
+            )
+            """)
+        
 
     def table_exists(self, table_name: str) -> bool: 
         """Check if a table exists in the LUME database"""
@@ -90,7 +118,6 @@ class TrainingDatabase:
         
         if not COLORS_AVAILABLE:
             self.logger.warning("colorama not installed. For colored logs, install with: pip install colorama")
-
 
     def __del__(self) -> None:
         # Close the database

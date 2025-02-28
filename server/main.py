@@ -2,6 +2,7 @@ from sys import implementation
 import redis
 import sockets
 import argparse
+import threading
 
 from training_db import TrainingDatabase
 from config import ENV
@@ -65,9 +66,12 @@ if __name__ == "__main__":
 
     # Request the current user's name
     name = input(f"{ORANGE}Please enter your imperial shortcode: {RESET}")
-
     # testing purposes: TODO remove
-    shortcode = 'nl621' if name is None else name 
+    shortcode = 'nl621' if name == "" else name 
+
+    gesture = ""
+    if args.mode == "data":
+        gesture = input(f"{ORANGE}Please enter the gesture to record: {RESET}")
 
     # Set the environmental variables in Redis
     set_env_vars(redisconn, args, shortcode)
@@ -77,7 +81,8 @@ if __name__ == "__main__":
                                  verbose=args.verbose)
 
     # Run the server
-    # endpoint.run(args.ip, args.polling_interval)
+    endpoint_thread = threading.Thread(target=endpoint.run, daemon=True, args=(args.ip, args.polling_interval))
+    endpoint_thread.start()
 
     db = None  # this will become the influx DB when deployed
 
@@ -86,4 +91,4 @@ if __name__ == "__main__":
 
         # Init the database
         db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
-
+        db.run(gesture)

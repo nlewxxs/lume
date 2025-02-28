@@ -164,27 +164,38 @@ class LumeServer:
                 
                 # Process incoming data until connection is lost
                 self.logger.debug("Entering data reception mode")
+                old_recording = False
                 while True:
                     result = self.receive_data()
                     if result is None:
                         self.logger.warning("Connection lost, returning to polling mode")
                         break
                     
-                    recording = keyboard.is_pressed("space")
+                    recording = keyboard.is_pressed("shift")
                     log_colour = Fore.MAGENTA if recording else Fore.WHITE
 
+                    # Print 'recording' only if we just started recording
+                    if recording and not old_recording:
+                        self.logger.info("Recording gesture...")
+                    if not recording and old_recording:
+                        self.logger.info("Processing gesture...")
+
+                    old_recording = recording
                     values, _ = result
                     
-                    # Print as info if collecting data (so always shows up)
-                    if self.mode == "data" and recording:
-                        self.logger.info(f"{log_colour}Received values {values} {Style.RESET_ALL}")
-                    # Otherwise keep this as debug
+                    self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
+                
+                    # If the mode is data collection then we only publish when spacebar
+                    if self.mode == "data":
+                        if recording:
+                            # Publish to the specified redis channel
+                            self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
                     else:
-                        self.logger.debug(f"Received values {values}")
+                        # Do it anyway
+                        self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
 
-                    
-                    # Publish to the specified redis channel
-                    self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
+
+
                         
         except KeyboardInterrupt:
             self.logger.warning("Received keyboard interrupt, shutting down...")

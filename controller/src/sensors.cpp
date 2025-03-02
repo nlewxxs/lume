@@ -56,7 +56,7 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     mpu.getAres();
 
     mpu.ax = (float)mpu.accelCount[0]*mpu.aRes; // - accelBias[0];
-    mpu.ay = (float)mpu.accelCount[0]*mpu.aRes; // - accelBias[1];
+    mpu.ay = (float)mpu.accelCount[1]*mpu.aRes; // - accelBias[1];
     mpu.az = (float)mpu.accelCount[2]*mpu.aRes; // - accelBias[2];
 
     mpu.readGyroData(mpu.gyroCount);  // Read the x/y/z adc values
@@ -73,7 +73,7 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     // User environmental x-axis correction in milliGauss, should be
     // automatically calculated
     mpu.magbias[0] = +470.;
-    // User environmental x-axis correction in milliGauss TODO axis??
+    // User environmental x-axis correction in milliGauss
     mpu.magbias[1] = +120.;
     // User environmental x-axis correction in milliGauss
     mpu.magbias[2] = +125.;
@@ -113,11 +113,11 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     mpu.yaw   *= RAD_TO_DEG;
     mpu.roll  *= RAD_TO_DEG;
 
-    // Declination of SparkFun Electronics (40°05'26.6"N 105°11'05.9"W) is
-    // 	8° 30' E  ± 0° 21' (or 8.5°) on 2016-07-19
+    // Declination of SparkFun Electronics (51°30'0.0"N 0°7'34.0"E) is
+    // 	1° 1' E  ± 0° 23'  changing by  0° 10' E per year, 2025-03-02
     // - http://www.ngdc.noaa.gov/geomag-web/#declination
-    //
-    mpu.yaw   -= 8.5;
+    
+    mpu.yaw -= 1.1;
 
     *pitch = mpu.pitch;
     *roll = mpu.roll;

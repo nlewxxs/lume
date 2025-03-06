@@ -1,9 +1,11 @@
+#include "MPU9250.h"
 #include "Particle.h"
 #include "spark_wiring.h"
 #include "sensors.hpp"
 
 namespace {
 byte MPU_EXPECTED_ADDRESS = 0x70;
+byte AK_EXPECTED_ADDRESS = 0x48;
 MPU9250 mpu; // MPU9250 object definition
 byte address = 0x00;
 bool initialised = false;
@@ -19,9 +21,11 @@ namespace sensors {
 std::variant<int, ErrorCode> InitMPU9250() {
 
     Wire.begin();
+    initialised = false;
 
     // Get the address of the MPU9250 and make sure it is as expected
     address = mpu.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
+    Log.info("Found MPU at %x", address);
     
     // Break early if MPU cannot be found at the right address
     if (address != MPU_EXPECTED_ADDRESS) return ErrorCode::MpuNotFound;
@@ -34,6 +38,31 @@ std::variant<int, ErrorCode> InitMPU9250() {
         // Calibrate gyro and accelerometers, load biases in bias registers
         mpu.calibrateMPU9250(mpu.gyroBias, mpu.accelBias);
         mpu.initMPU9250();
+        initialised = true;
+    }
+
+    return SUCCESS;
+}
+
+
+std::variant<int, ErrorCode> InitAK8963() {
+
+    Wire.begin();
+    initialised = false;
+
+    mpu.writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x22);
+    mpu.writeByte(MPU9250_ADDRESS, INT_ENABLE, 0x01);
+    delay(100);
+
+    // Get the address of the MPU9250 and make sure it is as expected
+    address = mpu.readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);
+    Log.info("Found AK8963 at %x", address);
+    
+    // Break early if MPU cannot be found at the right address
+    if (address != AK_EXPECTED_ADDRESS) return ErrorCode::AkNotFound;
+
+    else {
+        // Calibrate magnetometer
         mpu.initAK8963(mpu.magCalibration);
         initialised = true;
     }
@@ -41,11 +70,13 @@ std::variant<int, ErrorCode> InitMPU9250() {
     return SUCCESS;
 }
 
+
 void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2) {
     *flex0 = analogRead(FLEX0PIN);
     *flex1 = analogRead(FLEX1PIN);
     *flex2 = analogRead(FLEX2PIN);
 }
+
 
 std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {
 
@@ -119,9 +150,12 @@ std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, fl
     
     mpu.yaw -= 1.1;
 
-    *pitch = mpu.pitch;
-    *roll = mpu.roll;
-    *yaw = mpu.yaw;
+    // *pitch = mpu.pitch;
+    // *roll = mpu.roll;
+    // *yaw = mpu.yaw;
+    *pitch = mpu.mx;
+    *roll = mpu.my;
+    *yaw = mpu.mz;
 
     mpu.count = millis();
     mpu.sumCount = 0;

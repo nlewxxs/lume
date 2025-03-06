@@ -15,11 +15,15 @@ namespace sensors {
 
 enum class ErrorCode {
     MpuNotFound,
-    MpuUninitialised
+    MpuUninitialised,
+    AkNotFound,
 };
 
-// Initialise the sensor
+// Initialise the mpu
 std::variant<int, ErrorCode> InitMPU9250(void);
+
+// Initialise the magnetometer
+std::variant<int, ErrorCode> InitAK8963(void);
 
 // Update the flex sensor readings
 void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2);

@@ -69,6 +69,16 @@ void setup() {
             continue;
         }
 
+        init_res = sensors::InitAK8963();
+        //
+        if (std::holds_alternative<int>(init_res)) {
+            // bueno
+        } else {
+            Log.error("Failed to initialise Magnetometer!");
+            initialised = false; 
+            continue;
+        }
+
         std::variant<int, socket::ErrorCode> conn_res; 
         conn_res = socket::ListenForServerConn();
 

@@ -1,14 +1,27 @@
-#include "MPU9250.h"
+#include "MPU6050_6Axis_MotionApps20.h"
 #include "Particle.h"
+#include "helper_3dmath.h"
 #include "spark_wiring.h"
+#include "spark_wiring_error.h"
+#include <filesystem>
 #include "sensors.hpp"
 
 namespace {
 byte MPU_EXPECTED_ADDRESS = 0x70;
 byte AK_EXPECTED_ADDRESS = 0x48;
-MPU9250 mpu; // MPU9250 object definition
+MPU6050 mpu; // MPU9250 object definition
 byte address = 0x00;
 bool initialised = false;
+
+uint16_t fifoCount;
+uint8_t fifoBuffer[64];
+
+Quaternion q;
+VectorFloat gravity;
+VectorInt16 gyro;
+VectorInt16 accel;
+float ypr[3];
+
 static constexpr int SUCCESS = 0;
 // Define flex sensors
 static constexpr int FLEX0PIN = A0;
@@ -18,150 +31,81 @@ static constexpr int FLEX2PIN = A1;
 
 namespace sensors {
 
-std::variant<int, ErrorCode> InitMPU9250() {
+std::variant<int, ErrorCode> InitMPU6050() {
 
     Wire.begin();
-    initialised = false;
+    Wire.setClock(400000);
 
-    // Get the address of the MPU9250 and make sure it is as expected
-    address = mpu.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
-    Log.info("Found MPU at %x", address);
+    Log.info("Entered MPU initialisation...");
+    mpu.initialize();
     
+    initialised = mpu.testConnection();
     // Break early if MPU cannot be found at the right address
-    if (address != MPU_EXPECTED_ADDRESS) return ErrorCode::MpuNotFound;
+    if (!initialised) return ErrorCode::MpuUninitialised;
+    Log.info("MPU initialised");
+    
+    initialised = (mpu.dmpInitialize() == 0);
+    Log.info("DMP initialised");
 
-    else {
+    // Break early if DMP cannot be initialised
+    if (!initialised) return ErrorCode::MpuDMPUninitialised;
 
-        // Start by performing self test and reporting values
-        mpu.MPU9250SelfTest(mpu.SelfTest);
+    mpu.setXGyroOffset(220);
+    mpu.setYGyroOffset(76);
+    mpu.setZGyroOffset(-85);
+    mpu.setZAccelOffset(1788);
 
-        // Calibrate gyro and accelerometers, load biases in bias registers
-        mpu.calibrateMPU9250(mpu.gyroBias, mpu.accelBias);
-        mpu.initMPU9250();
-        initialised = true;
-    }
+    // Calibration Time: generate offsets and calibrate our MPU6050
+    mpu.CalibrateAccel(6);
+    mpu.CalibrateGyro(6);
 
+    // Enable DMP
+    mpu.setDMPEnabled(true);
+    
     return SUCCESS;
 }
-
-
-std::variant<int, ErrorCode> InitAK8963() {
-
-    Wire.begin();
-    initialised = false;
-
-    mpu.writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x22);
-    mpu.writeByte(MPU9250_ADDRESS, INT_ENABLE, 0x01);
-    delay(100);
-
-    // Get the address of the MPU9250 and make sure it is as expected
-    address = mpu.readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);
-    Log.info("Found AK8963 at %x", address);
-    
-    // Break early if MPU cannot be found at the right address
-    if (address != AK_EXPECTED_ADDRESS) return ErrorCode::AkNotFound;
-
-    else {
-        // Calibrate magnetometer
-        mpu.initAK8963(mpu.magCalibration);
-        initialised = true;
-    }
-
-    return SUCCESS;
-}
-
 
 void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2) {
     *flex0 = analogRead(FLEX0PIN);
-    *flex1 = analogRead(FLEX1PIN);
+
+    int32_t temp = analogRead(FLEX1PIN);
+    if (temp > 1000) *flex1 = temp;
+
     *flex2 = analogRead(FLEX2PIN);
 }
 
+std::variant<int, ErrorCode>
+UpdateMPU6050Readings(float *pitch, float *roll, float *yaw, int *ac_x,
+                      int *ac_y, int *ac_z, int *gy_x, int *gy_y, int *gy_z) {
 
-std::variant<int, ErrorCode> UpdateMPU9250Readings(float* pitch, float* roll, float* yaw) {
+  // Break early if uninitialised
+  if (!initialised)
+    return ErrorCode::MpuUninitialised;
 
-    // Break early if uninitialised
-    if (!initialised) return ErrorCode::MpuUninitialised;
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    mpu.dmpGetGyro(&gyro, fifoBuffer);
+    mpu.dmpGetAccel(&accel, fifoBuffer);
+  } else {
+    Log.error("Couldn't get DMP packet!!!!");
+    return ErrorCode::ReadError;
+  }
 
-    mpu.readAccelData(mpu.accelCount);  // Read the x/y/z adc values
-    mpu.getAres();
+  *pitch = ypr[1];
+  *roll = ypr[2];
+  *yaw = ypr[0];
 
-    mpu.ax = (float)mpu.accelCount[0]*mpu.aRes; // - accelBias[0];
-    mpu.ay = (float)mpu.accelCount[1]*mpu.aRes; // - accelBias[1];
-    mpu.az = (float)mpu.accelCount[2]*mpu.aRes; // - accelBias[2];
+  *ac_x = accel.x;
+  *ac_y = accel.y;
+  *ac_z = accel.z;
 
-    mpu.readGyroData(mpu.gyroCount);  // Read the x/y/z adc values
-    mpu.getGres();
+  *gy_x = gyro.x;
+  *gy_y = gyro.y;
+  *gy_z = gyro.z;
 
-    // Calculate the gyro value into actual degrees per second
-    // This depends on scale being set
-    mpu.gx = (float)mpu.gyroCount[0]*mpu.gRes;
-    mpu.gy = (float)mpu.gyroCount[1]*mpu.gRes;
-    mpu.gz = (float)mpu.gyroCount[2]*mpu.gRes;
-
-    mpu.readMagData(mpu.magCount);  // Read the x/y/z adc values
-    mpu.getMres();
-    // User environmental x-axis correction in milliGauss, should be
-    // automatically calculated
-    mpu.magbias[0] = +470.;
-    // User environmental x-axis correction in milliGauss
-    mpu.magbias[1] = +120.;
-    // User environmental x-axis correction in milliGauss
-    mpu.magbias[2] = +125.;
-
-    //compute
-
-    // Calculate the magnetometer values in milliGauss
-    // Include factory calibration per data sheet and user environmental
-    // corrections
-    // Get actual magnetometer value, this depends on scale being set
-    mpu.mx = (float)mpu.magCount[0]*mpu.mRes*mpu.magCalibration[0] -
-               mpu.magbias[0];
-    mpu.my = (float)mpu.magCount[1]*mpu.mRes*mpu.magCalibration[1] -
-               mpu.magbias[1];
-    mpu.mz = (float)mpu.magCount[2]*mpu.mRes*mpu.magCalibration[2] -
-               mpu.magbias[2];
-
-    mpu.updateTime();
-    
-    MahonyQuaternionUpdate(mpu.ax, mpu.ay, mpu.az, mpu.gx*DEG_TO_RAD,
-                         mpu.gy*DEG_TO_RAD, mpu.gz*DEG_TO_RAD, mpu.mx,
-                         mpu.my, mpu.mz, mpu.deltat);
-
-    mpu.delt_t = millis() - mpu.count;
-
-
-    mpu.yaw   = atan2(2.0f * (*(getQ()+1) * *(getQ()+2) + *getQ() *
-                    *(getQ()+3)), *getQ() * *getQ() + *(getQ()+1) * *(getQ()+1)
-                    - *(getQ()+2) * *(getQ()+2) - *(getQ()+3) * *(getQ()+3));
-    mpu.pitch = -asin(2.0f * (*(getQ()+1) * *(getQ()+3) - *getQ() *
-                    *(getQ()+2)));
-    mpu.roll  = atan2(2.0f * (*getQ() * *(getQ()+1) + *(getQ()+2) *
-                    *(getQ()+3)), *getQ() * *getQ() - *(getQ()+1) * *(getQ()+1)
-                    - *(getQ()+2) * *(getQ()+2) + *(getQ()+3) * *(getQ()+3));
-
-    mpu.pitch *= RAD_TO_DEG;
-    mpu.yaw   *= RAD_TO_DEG;
-    mpu.roll  *= RAD_TO_DEG;
-
-    // Declination of SparkFun Electronics (51°30'0.0"N 0°7'34.0"E) is
-    // 	1° 1' E  ± 0° 23'  changing by  0° 10' E per year, 2025-03-02
-    // - http://www.ngdc.noaa.gov/geomag-web/#declination
-    
-    mpu.yaw -= 1.1;
-
-    // *pitch = mpu.pitch;
-    // *roll = mpu.roll;
-    // *yaw = mpu.yaw;
-    *pitch = mpu.mx;
-    *roll = mpu.my;
-    *yaw = mpu.mz;
-
-    mpu.count = millis();
-    mpu.sumCount = 0;
-    mpu.sum = 0;
-
-    return SUCCESS;
+  return SUCCESS;
 }
 
 } /* namespace socket */ 

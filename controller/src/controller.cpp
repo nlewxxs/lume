@@ -25,11 +25,23 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 // Select the external antenna
 STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
 
+#define SDA_PIN D1
+#define SCL_PIN D0
+
 namespace {
 // Keep track of the pitch, roll and yaw as globals in an anonymous namespace
+static float old_pitch = 0.0;
+static float old_roll = 0.0;
+static float old_yaw = 0.0;
 static float pitch;
 static float roll;
 static float yaw;
+static int ac_x;
+static int ac_y;
+static int ac_z;
+static int gy_x;
+static int gy_y;
+static int gy_z;
 static int32_t flex0; // thumb
 static int32_t flex1; // index
 static int32_t flex2; // ring
@@ -59,22 +71,12 @@ void setup() {
 
         // Attempt MPU9250 initialisation
         std::variant<int, sensors::ErrorCode> init_res;
-        init_res = sensors::InitMPU9250();
+        init_res = sensors::InitMPU6050();
         //
         if (std::holds_alternative<int>(init_res)) {
             // bueno
         } else {
             Log.error("Failed to initialise MPU!");
-            initialised = false; 
-            continue;
-        }
-
-        init_res = sensors::InitAK8963();
-        //
-        if (std::holds_alternative<int>(init_res)) {
-            // bueno
-        } else {
-            Log.error("Failed to initialise Magnetometer!");
             initialised = false; 
             continue;
         }
@@ -118,19 +120,24 @@ void loop() {
 
     // Attempt to update the MPU readings
     std::variant<int, sensors::ErrorCode> read_res;
-    read_res = sensors::UpdateMPU9250Readings(&pitch, &roll, &yaw);
+    read_res = sensors::UpdateMPU6050Readings(&pitch, &roll, &yaw, &ac_x, &ac_y, &ac_z, &gy_x, &gy_y, &gy_z);
 
     // handle errors 
     if (std::holds_alternative<int>(read_res)) {
         // bueno
-        std::array<float, 3> imu_readings = {pitch, roll, yaw};
+        std::array<float, 3> imu_deltas = {pitch - old_pitch, roll - old_roll, yaw - old_yaw};
+        std::tie(old_pitch, old_roll, old_yaw) = {pitch, roll, yaw};
         std::array<int32_t, 3> flex_readings = {flex0, flex1, flex2};
-        socket::SendSensorReadings(imu_readings, flex_readings);
+        socket::SendSensorReadings(imu_deltas, flex_readings);
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
+        Log.info("ac_x = %d, ac_y = %d, ac_z = %d", ac_x, ac_y, ac_z);
+        // Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
     } else {
-        Log.error("Failed to read from MPU!");
+        // Log.error("Failed to read from MPU!");
+        // std::variant<int, sensors::ErrorCode> init_res;
+        // init_res = sensors::InitMPU6050();
     }
 
     if (millis() - lastUpdate > 5000) {

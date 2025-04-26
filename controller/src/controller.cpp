@@ -59,54 +59,40 @@ void setup() {
         delay(500);
     }
 
-
     socket::InitSockets();
-    bool initialised = false;
 
-    while (!initialised) { 
+    // Attempt MPU9250 initialisation
+    std::variant<int, sensors::ErrorCode> init_res;
+    init_res = sensors::InitMPU6050();
 
-        delay(1000);
-        Particle.process();
-        initialised = true;
-
-        // Attempt MPU9250 initialisation
-        std::variant<int, sensors::ErrorCode> init_res;
+    while (!std::holds_alternative<int>(init_res)) {
+        Log.error("Failed to initialise MPU!");
         init_res = sensors::InitMPU6050();
-        //
-        if (std::holds_alternative<int>(init_res)) {
-            // bueno
-        } else {
-            Log.error("Failed to initialise MPU!");
-            initialised = false; 
-            continue;
-        }
-
-        std::variant<int, socket::ErrorCode> conn_res; 
-        conn_res = socket::ListenForServerConn();
-
-        if (std::holds_alternative<int>(conn_res)) {
-            // bueno
-            Particle.publish("Controller IP", WiFi.localIP().toString().c_str());
-            Log.info("localIP=%s", WiFi.localIP().toString().c_str());
-        } else {
-            Log.error("Failed to connect to server!");
-            initialised = false; 
-            continue;
-        }
-
-        std::variant<IPAddress, socket::ErrorCode> ip;
-        ip = socket::GetServerIP();
-
-        if (std::holds_alternative<IPAddress>(ip)) {
-            // bueno
-            Particle.publish("Server IP", std::get<IPAddress>(ip).toString().c_str());
-            Log.info("Server IP: %s", std::get<IPAddress>(ip).toString().c_str());
-        } else {
-            Log.error("Failed to obtain server IP!");
-            initialised = false; 
-            continue;
-        }
     }
+
+    std::variant<int, socket::ErrorCode> conn_res; 
+    conn_res = socket::ListenForServerConn();
+
+    while (!std::holds_alternative<int>(conn_res)) {
+        Log.error("Failed to connect to server!");
+        conn_res = socket::ListenForServerConn();
+        delay(500);
+    }
+
+    Particle.publish("Controller IP", WiFi.localIP().toString().c_str());
+    Log.info("localIP=%s", WiFi.localIP().toString().c_str());
+
+    std::variant<IPAddress, socket::ErrorCode> ip;
+    ip = socket::GetServerIP();
+
+    while (!std::holds_alternative<IPAddress>(ip)) {
+        // bueno
+        Log.error("Failed to obtain server IP!");
+        ip = socket::GetServerIP();
+    }
+
+    Particle.publish("Server IP", std::get<IPAddress>(ip).toString().c_str());
+    Log.info("Server IP: %s", std::get<IPAddress>(ip).toString().c_str());
 
     Particle.publish("CONTROLLER INITIALISED");
     Log.info("Controller successfully initialised");
@@ -132,12 +118,10 @@ void loop() {
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
-        Log.info("ac_x = %d, ac_y = %d, ac_z = %d", ac_x, ac_y, ac_z);
-        // Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
+        // Log.info("ac_x = %d, ac_y = %d, ac_z = %d", ac_x, ac_y, ac_z);
+        Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
     } else {
-        // Log.error("Failed to read from MPU!");
-        // std::variant<int, sensors::ErrorCode> init_res;
-        // init_res = sensors::InitMPU6050();
+        Log.error("Failed to read from MPU!");
     }
 
     if (millis() - lastUpdate > 5000) {

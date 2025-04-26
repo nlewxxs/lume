@@ -40,6 +40,7 @@ std::variant<int, ErrorCode> InitMPU6050() {
     mpu.initialize();
     
     initialised = mpu.testConnection();
+
     // Break early if MPU cannot be found at the right address
     if (!initialised) return ErrorCode::MpuUninitialised;
     Log.info("MPU initialised");

@@ -9,6 +9,7 @@
 #include "Particle.h"
 #include "sensors.hpp"
 #include "socket.hpp"
+#include "filters.hpp"
 #include "spark_wiring_ipaddress.h"
 #include "wlan_hal.h"
 #include <climits>
@@ -30,9 +31,6 @@ STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
 
 namespace {
 // Keep track of the pitch, roll and yaw as globals in an anonymous namespace
-static float old_pitch = 0.0;
-static float old_roll = 0.0;
-static float old_yaw = 0.0;
 static float pitch;
 static float roll;
 static float yaw;
@@ -119,7 +117,7 @@ void loop() {
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
         // Log.info("ac_x = %d, ac_y = %d, ac_z = %d", ac_x, ac_y, ac_z);
-        Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
+        // Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
     } else {
         Log.error("Failed to read from MPU!");
     }

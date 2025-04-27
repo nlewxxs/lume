@@ -67,12 +67,15 @@ std::variant<int, ErrorCode> InitMPU6050() {
 }
 
 void UpdateFlexSensors(int32_t* flex0, int32_t* flex1, int32_t* flex2) {
-    *flex0 = analogRead(FLEX0PIN);
+    // protect against faulty connections
+    int32_t temp = analogRead(FLEX0PIN);
+    if (temp > 1000) *flex0 = temp;
 
-    int32_t temp = analogRead(FLEX1PIN);
+    temp = analogRead(FLEX1PIN);
     if (temp > 1000) *flex1 = temp;
 
-    *flex2 = analogRead(FLEX2PIN);
+    temp = analogRead(FLEX2PIN);
+    if (temp > 1000) *flex2 = temp;
 }
 
 std::variant<int, ErrorCode>

@@ -32,7 +32,8 @@ struct DataPacket {
 };
 
 // Process new readings
-void PushNewFlexReadings(const int& flex0, const int& flex1, const int& flex2); // flexsensors
+void PushNewFlexReadings(const int &flex0, const int &flex1,
+                         const int &flex2); // flexsensors
 void PushNewGyroReadings(Vector3& data);  // gyro
 void PushNewAccelReadings(Vector3& data); // accel
 void PushNewYprReadings(const float &pitch, const float &roll,

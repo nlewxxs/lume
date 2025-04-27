@@ -34,12 +34,14 @@ namespace {
 static float pitch;
 static float roll;
 static float yaw;
-static int ac_x;
-static int ac_y;
-static int ac_z;
-static int gy_x;
-static int gy_y;
-static int gy_z;
+
+static int acc_x;
+static int acc_y;
+static int acc_z;
+static int gyro_x;
+static int gyro_y;
+static int gyro_z;
+
 static int32_t flex0; // thumb
 static int32_t flex1; // index
 static int32_t flex2; // ring
@@ -101,23 +103,33 @@ void loop() {
     // We optimistically assume that nothing can go wrong with flex sensors
     // apart from a physical wiring issue
     sensors::UpdateFlexSensors(&flex0, &flex1, &flex2);
+    filters::PushNewFlexReadings(flex0, flex1, flex2);
 
     // Attempt to update the MPU readings
     std::variant<int, sensors::ErrorCode> read_res;
-    read_res = sensors::UpdateMPU6050Readings(&pitch, &roll, &yaw, &ac_x, &ac_y, &ac_z, &gy_x, &gy_y, &gy_z);
+    read_res = sensors::UpdateMPU6050Readings(
+        &pitch, &roll, &yaw, &acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z);
+
+    delay(5);
 
     // handle errors 
     if (std::holds_alternative<int>(read_res)) {
-        // bueno
-        std::array<float, 3> imu_deltas = {pitch - old_pitch, roll - old_roll, yaw - old_yaw};
-        std::tie(old_pitch, old_roll, old_yaw) = {pitch, roll, yaw};
-        std::array<int32_t, 3> flex_readings = {flex0, flex1, flex2};
-        socket::SendSensorReadings(imu_deltas, flex_readings);
+        // bueno 
+
+        // convert gyro and acc to Vector3 (floats x,y,z)
+        filters::Vector3 acc = {static_cast<float>(acc_x), static_cast<float>(acc_y),
+                       static_cast<float>(acc_z)};
+        filters::Vector3 gyro = {static_cast<float>(gyro_x), static_cast<float>(gyro_y),
+                       static_cast<float>(gyro_z)};
+
+        filters::PushNewAccelReadings(acc);
+        filters::PushNewGyroReadings(gyro);
+        filters::PushNewYprReadings(pitch, roll, yaw);
+
+        // socket::SendSensorReadings(imu_deltas, flex_readings);
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
-        // Log.info("ac_x = %d, ac_y = %d, ac_z = %d", ac_x, ac_y, ac_z);
-        // Log.info("gy_x = %d, gy_y = %d, gy_z = %d", gy_x, gy_y, gy_z);
     } else {
         Log.error("Failed to read from MPU!");
     }

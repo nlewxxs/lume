@@ -2,6 +2,7 @@
 #define SOCKET_H_
 
 #include "Particle.h"
+#include "filters.hpp"
 #include "spark_wiring_ipaddress.h"
 #include <variant>
 
@@ -19,7 +20,8 @@ std::variant<int, ErrorCode> ListenForServerConn();
 
 std::variant<IPAddress, ErrorCode> GetServerIP();
 
-std::variant<int, ErrorCode> SendSensorReadings(std::array<float, 3>& imu_readings, std::array<int32_t, 3>& flex_readings);
+std::variant<int, ErrorCode> SendSensorReadings(const filters::DataPacket& data);
 
 } /* namespace socket */
+
 #endif /* SOCKET_H_ */

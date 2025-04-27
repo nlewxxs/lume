@@ -1,6 +1,7 @@
+#include <deque>
+
 #include "Particle.h"
 #include "filters.hpp"
-#include <deque>
 
 namespace {
 static constexpr std::size_t kWindowSize{
@@ -8,14 +9,17 @@ static constexpr std::size_t kWindowSize{
 static constexpr int kFlexSensorThreshold{
     1300}; // threshold above which sensor is deemed 'bent'
 
+// accelerometer data window
 static std::deque<float> accel_x_raw(kWindowSize, 0.0);
 static std::deque<float> accel_y_raw(kWindowSize, 0.0);
 static std::deque<float> accel_z_raw(kWindowSize, 0.0);
 
+// gyroscope data window
 static std::deque<float> gyro_x_raw(kWindowSize, 0.0);
 static std::deque<float> gyro_y_raw(kWindowSize, 0.0);
 static std::deque<float> gyro_z_raw(kWindowSize, 0.0);
 
+// orientation (pitch / roll / yaw) data window 
 static std::deque<float> pitch_raw(kWindowSize, 0.0);
 static std::deque<float> roll_raw(kWindowSize, 0.0);
 static std::deque<float> yaw_raw(kWindowSize, 0.0);

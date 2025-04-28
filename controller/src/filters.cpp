@@ -7,7 +7,7 @@ namespace {
 static constexpr std::size_t kWindowSize{
     50}; // number of readings to consider in a single window
 static constexpr int kFlexSensorThreshold{
-    1300}; // threshold above which sensor is deemed 'bent'
+    1700}; // threshold above which sensor is deemed 'bent'
 
 // accelerometer data window
 static std::deque<float> accel_x_raw(kWindowSize, 0.0);

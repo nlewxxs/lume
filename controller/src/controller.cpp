@@ -126,9 +126,11 @@ void loop() {
         filters::PushNewGyroReadings(gyro);
         filters::PushNewYprReadings(pitch, roll, yaw);
         socket::SendSensorReadings(*filters::GetDataPacket());
+        filters::DataPacket* packet_ptr = filters::GetDataPacket();
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
+        // Log.info("%d | %d | %d", packet_ptr->flex0, packet_ptr->flex1, packet_ptr->flex2);
     } else {
         Log.error("Failed to read from MPU!");
     }

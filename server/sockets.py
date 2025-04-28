@@ -15,6 +15,10 @@ from config import ENV
 from lume_logger import *
 from typing import Tuple, Optional, List, Dict
 
+PAYLOAD_SIZE = 49  # sensor payload size in bytes
+# Number of data points in one 'window' of data (used for sliding-window data proc)
+DATA_WINDOW_SIZE = 49  
+
 
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
@@ -27,7 +31,6 @@ class LumeServer:
             verbose: Enable debug-level logging if True
         """
         self.port = port
-
         self.redisconn = redisconn
         self.config = ENV
 
@@ -71,27 +74,37 @@ class LumeServer:
         if not COLORS_AVAILABLE:
             self.logger.warning("colorama not installed. For colored logs, install with: pip install colorama")
     
-    def decode_floats(self, data: bytes) -> List[float]:
-        """Decode binary data into a list of floats.
+    def unpack(self, data: bytes) -> List[float]:
+        """Decode bitpacked binary data into a list of floats.
         
         Args:
             data: Binary data received from the device
             
         Returns:
-            List of float values
+            List of float values, plus 3 booleans at the end
         """
-        # Check if we have exactly 6 floats (4 bytes each)
-        expected_size = 6 * 4  # 6 floats, 4 bytes each
-        
-        if len(data) == expected_size:
-            # Unpack 6 floats (IEEE 754 format, network byte order)
-            return list(struct.unpack('<3f3i', data))
-        elif len(data) > expected_size:
+
+        if len(data) == PAYLOAD_SIZE:
+            # Unpack 12 floats (IEEE 754 format, network byte order)
+            *floats, control = struct.unpack('<12fB', data)
+
+            # Extract the booleans for flex sensors from the last byte
+            flex0 = bool(control & 0b10000000)
+            flex1 = bool(control & 0b01000000)
+            flex2 = bool(control & 0b00100000)
+
+            # append them onto the floats array and return it
+            floats.append(flex0)
+            floats.append(flex1)
+            floats.append(flex2)
+            return floats
+            
+        elif len(data) > PAYLOAD_SIZE:
             self.logger.warning(f"Received more data than expected: {len(data)} bytes")
-            # Still try to parse the first 6 floats
-            return list(struct.unpack('<3f3i', data[:expected_size]))
+            # Still try to parse the first 12 floats
+            return list(struct.unpack('<12f', data[:PAYLOAD_SIZE]))
         else:
-            self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {expected_size}")
+            self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {PAYLOAD_SIZE}")
             return []
     
     def poll_device(self, device_ip: str) -> bool:
@@ -113,8 +126,8 @@ class LumeServer:
             self.logger.info(f"Connection established with {addr}")
             
             # Try to decode as floats if it looks like float data
-            if len(data) >= 24:  # At least 6 floats
-                values = self.decode_floats(data)
+            if len(data) >= PAYLOAD_SIZE:  # At least payload size
+                values = self.unpack(data)
                 if values:
                     self.logger.info(f"Received initial values: {values}")
             
@@ -132,7 +145,7 @@ class LumeServer:
         """
         try:
             data, addr = self.sock.recvfrom(1024)
-            values = self.decode_floats(data)
+            values = self.unpack(data)
             
             if values:
                 return values, addr
@@ -142,7 +155,17 @@ class LumeServer:
         except (socket.timeout, TimeoutError):
             self.logger.warning("Receive operation timed out")
             return None
-    
+
+    def publish_sensor_data(self, data): 
+        """Publish the filtered sensor data onto the respective Redis channels
+        so that it can be post-processed"""
+        for i in range(len(data)):
+            queue = ENV['redis_sensors_channels'][i]
+            content = (int(data[i] == "True") if (queue in ["flex0","flex1","flex2"]) else data[i])
+            self.logger.info(f"pushing {content} to {queue}")
+            self.redisconn.lpush(queue, content)
+            self.redisconn.ltrim(queue, 0, DATA_WINDOW_SIZE - 1)
+
     def run(self, device_ip: str, polling_interval: float = 5.0):
         """Run the UDP server main loop.
         
@@ -182,7 +205,8 @@ class LumeServer:
 
                     old_recording = recording
                     values, _ = result
-                    
+
+                    self.publish_sensor_data(values)
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
                 
                     # If the mode is data collection then we only publish when spacebar
@@ -193,8 +217,6 @@ class LumeServer:
                     else:
                         # Do it anyway
                         self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
-
-
 
                         
         except KeyboardInterrupt:

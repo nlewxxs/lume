@@ -126,7 +126,7 @@ void loop() {
         filters::PushNewGyroReadings(gyro);
         filters::PushNewYprReadings(pitch, roll, yaw);
         socket::SendSensorReadings(*filters::GetDataPacket());
-        filters::DataPacket* packet_ptr = filters::GetDataPacket();
+        // filters::DataPacket* packet_ptr = filters::GetDataPacket();
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);

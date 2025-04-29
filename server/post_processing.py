@@ -96,7 +96,7 @@ class DataProcessor:
         signals = []
         for key in self.signal_keys:
             raw = self.redisconn.lrange(key, 0, -1)
-            if not raw:
+            if not raw or len(raw) < self.config['data_window_size']:
                 return self.lines  # wait until Redis has data
             signals.append(np.array([float(x) for x in raw]))
 
@@ -104,6 +104,13 @@ class DataProcessor:
             # Compute FFT
             fft_vals = np.fft.fft(signal)
             fft_freqs = np.fft.fftfreq(self.N, self.T)
+
+            # Trim in the case where it has read the values after socket.py has
+            # pushed the 51st element but not yet trimmed it. There is no need
+            # for a mutex here, it will not make a huge difference to add
+            # atomic reads
+            window_size = self.config['data_window_size']
+            fft_vals, fft_freqs = fft_vals[:window_size], fft_freqs[:window_size]
 
             # Only positive freqs
             pos_mask = fft_freqs >= 0
@@ -127,6 +134,7 @@ class DataProcessor:
             if self.do_fft:
                 self.ani = animation.FuncAnimation(self.fig, self.fft, interval=100, blit=True)
                 plt.show(block=True)
+
         except KeyboardInterrupt:
             # Warning is already given by other modules, no point repeating
             pass

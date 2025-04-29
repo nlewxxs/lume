@@ -13,7 +13,7 @@ import redis
 
 from config import ENV
 from lume_logger import *
-from typing import Tuple, Optional, List, Dict
+from typing import Tuple, Optional, List
 
 
 class LumeServer:
@@ -187,12 +187,14 @@ class LumeServer:
                 self.logger.debug("Entering data reception mode")
                 old_recording = False
                 pub_counter = 0
+
                 while True:
                     result = self.receive_data()
+
                     if result is None:
                         self.logger.warning("Connection lost, returning to polling mode")
                         break
-                    
+
                     recording = keyboard.is_pressed("shift")
                     log_colour = Fore.MAGENTA if recording else Fore.WHITE
 
@@ -212,16 +214,6 @@ class LumeServer:
                     pub_counter += 1
                     if (pub_counter % self.config["data_window_size"] == 0):
                         self.redisconn.incr(self.config["redis_data_version_channel"])
-                
-                    # If the mode is data collection then we only publish when spacebar
-                    if self.mode == "data":
-                        if recording:
-                            # Publish to the specified redis channel
-                            self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
-                    else:
-                        # Do it anyway
-                        self.redisconn.publish(self.config['redis_sensors_channel'], str(values))
-
                         
         except KeyboardInterrupt:
             self.logger.warning("Received keyboard interrupt, shutting down...")

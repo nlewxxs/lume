@@ -32,7 +32,7 @@ def parse_arguments():
     parser.add_argument(
         "--polling-interval", 
         type=float, 
-        default=5.0,
+        default=2.0,
         help="Time in seconds between polling attempts (default: 5.0)"
     )
     parser.add_argument(

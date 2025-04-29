@@ -164,7 +164,7 @@ class LumeServer:
             self.redisconn.lpush(queue, content)
             self.redisconn.ltrim(queue, 0, self.config["data_window_size"] - 1)
 
-    def run(self, device_ip: str, polling_interval: float = 5.0):
+    def run(self, device_ip: str, polling_interval: float = 2.0):
         """Run the UDP server main loop.
         
         Args:

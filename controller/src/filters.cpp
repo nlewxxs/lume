@@ -4,29 +4,12 @@
 #include "filters.hpp"
 
 namespace {
-static constexpr std::size_t kWindowSize{
-    50}; // number of readings to consider in a single window
 static constexpr int kFlexSensorThreshold{
     1700}; // threshold above which sensor is deemed 'bent'
 
-// accelerometer data window
-static std::deque<float> accel_x_raw(kWindowSize, 0.0);
-static std::deque<float> accel_y_raw(kWindowSize, 0.0);
-static std::deque<float> accel_z_raw(kWindowSize, 0.0);
-
-// gyroscope data window
-static std::deque<float> gyro_x_raw(kWindowSize, 0.0);
-static std::deque<float> gyro_y_raw(kWindowSize, 0.0);
-static std::deque<float> gyro_z_raw(kWindowSize, 0.0);
-
-// orientation (pitch / roll / yaw) data window 
-static std::deque<float> pitch_raw(kWindowSize, 0.0);
-static std::deque<float> roll_raw(kWindowSize, 0.0);
-static std::deque<float> yaw_raw(kWindowSize, 0.0);
-
 static filters::DataPacket packet;
 
-static constexpr std::array<float, 101> kGyroLPFCoeffs = {
+static constexpr std::array<float, kWindowSize> kGyroLPFCoeffs = {
     -4.70446993e-04, -2.91949771e-04,  6.11132306e-19,  3.31610501e-04,
     6.03730161e-04,  7.11082490e-04,  5.74378721e-04,  1.78727573e-04,
     -3.96977400e-04, -9.78505607e-04, -1.33549532e-03, -1.25907226e-03,
@@ -54,7 +37,7 @@ static constexpr std::array<float, 101> kGyroLPFCoeffs = {
     6.03730161e-04,  3.31610501e-04,  6.11132306e-19, -2.91949771e-04,
     -4.70446993e-04 };
 
-static constexpr std::array<float, 101> kAccelLPFCoeffs = {
+static constexpr std::array<float, kWindowSize> kAccelLPFCoeffs = {
     9.92182149e-05,  4.05709213e-04,  5.53786308e-04,  4.60823912e-04,
     1.27327902e-04, -3.41344531e-04, -7.49529997e-04, -8.75590470e-04,
     -5.75606148e-04,  1.15207114e-04,  9.43165061e-04,  1.50511023e-03,
@@ -82,7 +65,7 @@ static constexpr std::array<float, 101> kAccelLPFCoeffs = {
     1.27327902e-04,  4.60823912e-04,  5.53786308e-04,  4.05709213e-04,
     9.92182149e-05 };
 
-static constexpr std::array<float, 101> kOrientLPFCoeffs = {
+static constexpr std::array<float, kWindowSize> kOrientLPFCoeffs = {
     3.60568101e-04,  2.01379742e-04, -4.07991328e-19, -2.28736734e-04,
     -4.62721286e-04, -6.70761828e-04, -8.13430194e-04, -8.47574980e-04,
     -7.34544437e-04, -4.50986505e-04,  8.18898687e-19,  5.80297744e-04,
@@ -113,20 +96,30 @@ static constexpr std::array<float, 101> kOrientLPFCoeffs = {
 
 namespace filters {
 
-// LPF for Gyroscope readings
-void GyroLowPass(const std::deque<float>& raw, float& filtered) {
-    filtered = raw.back();
-}
+// Define LP FIR filters, num taps is according to kWindowSize
+FIRFilter accel_x_lpf(kAccelLPFCoeffs);
+FIRFilter accel_y_lpf(kAccelLPFCoeffs);
+FIRFilter accel_z_lpf(kAccelLPFCoeffs);
+FIRFilter gyro_x_lpf(kGyroLPFCoeffs);
+FIRFilter gyro_y_lpf(kGyroLPFCoeffs);
+FIRFilter gyro_z_lpf(kGyroLPFCoeffs);
+FIRFilter pitch_lpf(kOrientLPFCoeffs);
+FIRFilter roll_lpf(kOrientLPFCoeffs);
+FIRFilter yaw_lpf(kOrientLPFCoeffs);
 
-// LPF for Accelerometer readings
-void AccelLowPass(const std::deque<float>& raw, float& filtered) {
-    filtered = raw.back();
-}
+// Process new reading
+float FIRFilter::process(float input) {
+    // Push the data along one, popping from front of deque
+    data.pop_back();
+    data.push_front(input);
 
-// LPF for Pitch, Roll and Yaw readings - use same coeffs for each one
-void OrientationLowPass(const std::deque<float>& raw, float& filtered) {
-    // TODO: actually do the filter
-    filtered = raw.back();
+    // process LPF readings
+    float output = 0.0f;
+    for (std::size_t i = 0; i < kWindowSize; i++) {
+      output += (coeffs)[i] * data[i];
+    }
+
+    return output;
 }
 
 bool IsBent(const int& data) {
@@ -135,56 +128,28 @@ bool IsBent(const int& data) {
 
 // Process new readings
 void PushNewGyroReadings(Vector3& data) {
-    // pop old elements
-    gyro_x_raw.pop_front();
-    gyro_y_raw.pop_front();
-    gyro_z_raw.pop_front();
-    // push in new elements
-    gyro_x_raw.push_back(data.x);
-    gyro_y_raw.push_back(data.y);
-    gyro_z_raw.push_back(data.z);
-    // apply filters
-    GyroLowPass(gyro_x_raw, packet.gy_x);
-    GyroLowPass(gyro_y_raw, packet.gy_y);
-    GyroLowPass(gyro_z_raw, packet.gy_z);
+    packet.gy_x = gyro_x_lpf.process(data.x);
+    packet.gy_y = gyro_y_lpf.process(data.y);
+    packet.gy_z = gyro_z_lpf.process(data.z);
 }
 
 void PushNewAccelReadings(Vector3& data) {
-    // pop old elements
-    accel_x_raw.pop_front();
-    accel_y_raw.pop_front();
-    accel_z_raw.pop_front();
-    // push in new elements
-    accel_x_raw.push_back(data.x);
-    accel_y_raw.push_back(data.y);
-    accel_z_raw.push_back(data.z);
-    // apply filters
-    AccelLowPass(accel_x_raw, packet.acc_x);
-    AccelLowPass(accel_y_raw, packet.acc_y);
-    AccelLowPass(accel_z_raw, packet.acc_z);
+    packet.acc_x = accel_x_lpf.process(data.x);
+    packet.acc_y = accel_y_lpf.process(data.y);
+    packet.acc_z = accel_z_lpf.process(data.z);
 }
 
 void PushNewYprReadings(const float &pitch, const float &roll,
                         const float &yaw) {
-    // Pop old elements
-    pitch_raw.pop_front();
-    roll_raw.pop_front();
-    yaw_raw.pop_front();
-    // Push in new elements
-    pitch_raw.push_back(pitch);
-    roll_raw.push_back(roll);
-    yaw_raw.push_back(yaw);
-    // Apply lowpass filters and store in temps
-    float new_pitch = 0.0;
-    float new_roll = 0.0;
-    float new_yaw = 0.0;
-    OrientationLowPass(pitch_raw, new_pitch);
-    OrientationLowPass(roll_raw, new_roll);
-    OrientationLowPass(yaw_raw, new_yaw);
-    // Calculate the diffs
+    float new_pitch = pitch_lpf.process(pitch);
+    float new_roll = pitch_lpf.process(roll);
+    float new_yaw = pitch_lpf.process(yaw);
+
+    // Calculate the deltas first before replacing in packet
     packet.d_pitch = new_pitch - packet.pitch;
     packet.d_roll = new_roll - packet.roll;
     packet.d_yaw = new_yaw - packet.yaw;
+
     // Copy in the new filtered ypr
     packet.pitch = new_pitch;
     packet.roll = new_roll;

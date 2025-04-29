@@ -4,6 +4,10 @@
 #include "Particle.h"
 #include <climits>
 #include <cstring>
+#include <deque>
+
+static constexpr std::size_t kWindowSize{
+    101}; // number of readings to consider in a single window
 
 namespace filters {
 
@@ -30,6 +34,19 @@ struct DataPacket {
     bool flex1;
     bool flex2;
 };
+
+class FIRFilter {
+public:
+  FIRFilter(const std::array<float, kWindowSize>& coeffs) noexcept
+  : data(kWindowSize, 0.0f), coeffs(coeffs) {}
+      
+  float process(float input);
+
+private: 
+    std::deque<float> data;
+    const std::array<float, kWindowSize>& coeffs;
+};
+
 
 // Process new readings
 void PushNewFlexReadings(const int &flex0, const int &flex1,

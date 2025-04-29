@@ -15,16 +15,12 @@ from config import ENV
 from lume_logger import *
 from typing import Tuple, Optional, List, Dict
 
-PAYLOAD_SIZE = 49  # sensor payload size in bytes
-# Number of data points in one 'window' of data (used for sliding-window data proc)
-DATA_WINDOW_SIZE = 49  
-
 
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
     def __init__(self, redisconn: redis.client.Redis, port: int = 8888, verbose: bool = False):
-        """Initialize the UDP server.
+        """Initialise the UDP server.
         
         Args:
             port: UDP port number to use (default: 8888)
@@ -83,8 +79,9 @@ class LumeServer:
         Returns:
             List of float values, plus 3 booleans at the end
         """
+        payload_size = self.config["payload_size"]
 
-        if len(data) == PAYLOAD_SIZE:
+        if len(data) == payload_size:
             # Unpack 12 floats (IEEE 754 format, network byte order)
             *floats, control = struct.unpack('<12fB', data)
 
@@ -99,12 +96,12 @@ class LumeServer:
             floats.append(flex2)
             return floats
             
-        elif len(data) > PAYLOAD_SIZE:
+        elif len(data) > payload_size:
             self.logger.warning(f"Received more data than expected: {len(data)} bytes")
             # Still try to parse the first 12 floats
-            return list(struct.unpack('<12f', data[:PAYLOAD_SIZE]))
+            return list(struct.unpack('<12f', data[:payload_size]))
         else:
-            self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {PAYLOAD_SIZE}")
+            self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {payload_size}")
             return []
     
     def poll_device(self, device_ip: str) -> bool:
@@ -126,7 +123,7 @@ class LumeServer:
             self.logger.info(f"Connection established with {addr}")
             
             # Try to decode as floats if it looks like float data
-            if len(data) >= PAYLOAD_SIZE:  # At least payload size
+            if len(data) >= self.config["payload_size"]:  # At least payload size
                 values = self.unpack(data)
                 if values:
                     self.logger.info(f"Received initial values: {values}")
@@ -162,9 +159,10 @@ class LumeServer:
         for i in range(len(data)):
             queue = ENV['redis_sensors_channels'][i]
             content = (int(data[i] == "True") if (queue in ["flex0","flex1","flex2"]) else data[i])
-            self.logger.info(f"pushing {content} to {queue}")
+
+            self.logger.debug(f"pushing {content} to {queue}")
             self.redisconn.lpush(queue, content)
-            self.redisconn.ltrim(queue, 0, DATA_WINDOW_SIZE - 1)
+            self.redisconn.ltrim(queue, 0, self.config["data_window_size"] - 1)
 
     def run(self, device_ip: str, polling_interval: float = 5.0):
         """Run the UDP server main loop.
@@ -188,6 +186,7 @@ class LumeServer:
                 # Process incoming data until connection is lost
                 self.logger.debug("Entering data reception mode")
                 old_recording = False
+                pub_counter = 0
                 while True:
                     result = self.receive_data()
                     if result is None:
@@ -208,6 +207,11 @@ class LumeServer:
 
                     self.publish_sensor_data(values)
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
+
+                    # Publish values and update the version counter if new full window of data
+                    pub_counter += 1
+                    if (pub_counter % self.config["data_window_size"] == 0):
+                        self.redisconn.incr(self.config["redis_data_version_channel"])
                 
                     # If the mode is data collection then we only publish when spacebar
                     if self.mode == "data":

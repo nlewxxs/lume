@@ -1,6 +1,9 @@
 from sys import implementation
 import redis
 import sockets
+import post_processing
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import argparse
 import threading
 
@@ -88,7 +91,10 @@ if __name__ == "__main__":
 
     # OPTION 1 - Data collection mode
     if args.mode == "data":
-
         # Init the database
         db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
         db.run(gesture)
+    elif args.mode == "fft":
+        post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=True, verbose=args.verbose)
+        post_proc.run()
+

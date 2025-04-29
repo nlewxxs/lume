@@ -3,7 +3,6 @@ Some configuration values for the system
 """
 
 ENV = {
-    "redis_sensors_channel" : 'sensors',  # Topic to publish sensor data over
     "redis_sensors_channels" : ['pitch', 'roll', 'yaw', 'd_pitch', 'd_roll',
                                 'd_yaw', 'acc_x', 'acc_y', 'acc_z', 'gy_x',
                                 'gy_y', 'gy_z', 'flex0', 'flex1', 'flex2'],

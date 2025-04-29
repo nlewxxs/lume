@@ -125,7 +125,7 @@ class TrainingDatabase:
     def run(self, gesture: str) -> None:
         # Listen on the sensors topic for data
         global running
-        channel = ENV['redis_sensors_channel']
+        channel = 'sensors'
         sensors_subscription = self.redisconn.pubsub()
         sensors_subscription.subscribe(channel)
 

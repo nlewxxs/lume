@@ -158,7 +158,7 @@ class LumeServer:
         so that it can be post-processed"""
         for i in range(len(data)):
             queue = ENV['redis_sensors_channels'][i]
-            content = (int(data[i] == "True") if (queue in ["flex0","flex1","flex2"]) else data[i])
+            content = (float(data[i] == 1.0) if (queue in ["flex0","flex1","flex2"]) else data[i])
 
             self.logger.debug(f"pushing {content} to {queue}")
             self.redisconn.lpush(queue, content)

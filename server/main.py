@@ -92,9 +92,16 @@ if __name__ == "__main__":
 
     # OPTION 1 - Data collection mode
     if args.mode == "data":
+
+        post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=False, verbose=args.verbose)
+        post_proc_thread = threading.Thread(target=post_proc.run, daemon=True)
+        # post_proc_thread.start()
+        post_proc.run()
+
         # Init the database
-        db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
-        db.run(gesture)
+        # db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
+        # db.run(gesture)
+
     elif args.mode == "fft":
         post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=True, verbose=args.verbose)
         post_proc.run()

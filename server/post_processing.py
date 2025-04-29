@@ -5,10 +5,12 @@ includes calculating means, variances and energies. There is also an option to
 do an FFT, as this was required for choosing the appropriate corner frequency
 for the LPFs on the controller side. 
 """
+from locale import windows_locale
 import logging
 import sys
 import redis
 import struct
+import math
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
@@ -136,8 +138,10 @@ class DataProcessor:
         return self.lines
 
     def calculate_mean_and_variance(self, data) -> Tuple[float, float]:
-        """Calculate both the mean and the variance of a set of data, using
-        Welford's algorithm"""
+        """
+        Calculate both the mean and the variance of a set of data, using
+        Welford's algorithm
+        """
         n = 0
         mean = 0.0
         m2 = 0.0
@@ -151,9 +155,11 @@ class DataProcessor:
 
         return mean, m2 / (n - 1)
 
-    def calculate_energy(self):
-        """Calculate the energy of a signal over a specified window"""
-        pass
+    def calculate_energy(self, x_in : List[float], y_in : List[float], z_in : List[float]):
+        """
+        Calculate the energy of a signal over a specified window
+        """
+        return sum(x**2 + y**2 + z**2 for x, y, z in zip(x_in, y_in, z_in))        
 
     def pack(self, data : List[float]) -> bytes:
         """Pack the filtered and post-processed sensor data in to a""" 
@@ -253,7 +259,13 @@ class DataProcessor:
             sensor_data_packet[22] = gy_y_var
             sensor_data_packet[23] = gy_z_var
 
-            # ... energies inserted later
+            sensor_data_packet[24] = self.calculate_energy(signals['acc_x'],
+                                                           signals['acc_y'],
+                                                           signals['acc_z'])
+            sensor_data_packet[25] = self.calculate_energy(signals['gy_x'],
+                                                           signals['gy_y'],
+                                                           signals['gy_z'])
+
             sensor_data_packet[26] = signals['flex0'][0]
             sensor_data_packet[27] = signals['flex1'][0]
             sensor_data_packet[28] = signals['flex2'][0]

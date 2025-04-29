@@ -86,7 +86,9 @@ class DataProcessor:
             self.logger.warning("colorama not installed. For colored logs, install with: pip install colorama")
 
     def fft(self, frame):
-        """Perform an FFT of the filtered accelerometer, gyro, and attitude readings"""
+        """Perform an FFT of the filtered accelerometer, gyro, and attitude
+        readings. This is displayed in a live window, updating roughly every
+        ~16 seconds (for a batch of 1024 readings per window)"""
 
         current_version = self.redisconn.get(self.config['redis_data_version_channel'])
         if current_version == self.last_seen or current_version == None:

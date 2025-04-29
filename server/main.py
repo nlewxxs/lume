@@ -47,7 +47,8 @@ def parse_arguments():
         default="deploy",
         help="Define the server runtime mode.  \
             Choose between < data > (for data collection) and < deploy > for \
-            deployment mode, < training > for training the model. Default is 'deploy'."
+            deployment mode, < training > for training the model, and < fft > \
+            for performing an FFT signal analysis.  Default is 'deploy'."
     )
     return parser.parse_args()
 

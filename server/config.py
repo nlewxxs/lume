@@ -11,7 +11,8 @@ ENV = {
     "redis_data_version_channel" : "window_version",
     "payload_size" : 49,  # sensor payload size in bytes
 # Number of data points in one 'window' of data (used for sliding-window data proc)
-    "data_window_size" : 1024,
+    "fft_data_window_size" : 1024,
+    "normal_data_window_size" : 48,
     "sampling_rate" : 64, 
     "pg_db_name" : 'lume', 
     "pg_db_host" : '127.0.0.1', 

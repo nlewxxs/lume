@@ -81,7 +81,7 @@ if __name__ == "__main__":
     set_env_vars(redisconn, args, shortcode)
 
     # Startup a udp endpoint
-    endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, \
+    endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, fft=(args.mode == "fft"), \
                                  verbose=args.verbose)
 
     # Run the server

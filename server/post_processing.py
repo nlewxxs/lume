@@ -33,11 +33,12 @@ class DataProcessor:
         self.do_fft = fft
         self.mode = redisconn.get(ENV["redis_mode_variable"])
         self._setup_colored_logging(verbose)
+        self.window_size = ENV["fft_data_window_size"] if fft else ENV["normal_data_window_size"]
 
         if fft:
             self.sampling_rate = self.config["sampling_rate"]
             self.T = 1 / self.sampling_rate
-            self.N = self.config["data_window_size"]
+            self.N = self.window_size
 
             self.signal_keys = ['acc_x', 'acc_y', 'acc_z', 'gy_x', 'gy_y', 'gy_z', 'pitch', 'roll', 'yaw']
             self.signal_names = ['Accel X', 'Accel Y', 'Accel Z', 'Gyro X', 'Gyro Y', 'Gyro Z', 'Pitch', 'Roll', 'Yaw']
@@ -103,7 +104,7 @@ class DataProcessor:
         signals = []
         for key in self.signal_keys:
             raw = self.redisconn.lrange(key, 0, -1)
-            if not raw or len(raw) < self.config['data_window_size']:
+            if not raw or len(raw) < self.window_size:
                 return self.lines  # wait until Redis has data
             signals.append(np.array([float(x) for x in raw]))
 
@@ -116,7 +117,7 @@ class DataProcessor:
             # pushed the 51st element but not yet trimmed it. There is no need
             # for a mutex here, it will not make a huge difference to add
             # atomic reads
-            window_size = self.config['data_window_size']
+            window_size = self.window_size
             fft_vals, fft_freqs = fft_vals[:window_size], fft_freqs[:window_size]
 
             # Only positive freqs
@@ -207,7 +208,7 @@ class DataProcessor:
             signals = {}
             for key in self.config["redis_sensors_channels"]:
                 raw = self.redisconn.lrange(key, 0, -1)
-                if not raw or len(raw) < self.config['data_window_size']:
+                if not raw or len(raw) < self.window_size:
                     continue  # wait until required amount
                 signals[key] = np.array([float(x) for x in raw])
 

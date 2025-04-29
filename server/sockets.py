@@ -19,7 +19,7 @@ from typing import Tuple, Optional, List
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
-    def __init__(self, redisconn: redis.client.Redis, port: int = 8888, verbose: bool = False):
+    def __init__(self, redisconn: redis.client.Redis, port: int = 8888, fft: bool = False, verbose: bool = False):
         """Initialise the UDP server.
         
         Args:
@@ -32,6 +32,7 @@ class LumeServer:
 
         # Extract the run mode straight away
         self.mode = redisconn.get(ENV["redis_mode_variable"])
+        self.window_size = ENV["fft_data_window_size"] if fft else ENV["normal_data_window_size"]
         
         # Setup logging with color
         self._setup_colored_logging(verbose)
@@ -156,13 +157,13 @@ class LumeServer:
     def publish_sensor_data(self, data): 
         """Publish the filtered sensor data onto the respective Redis channels
         so that it can be post-processed"""
+
         for i in range(len(data)):
             queue = ENV['redis_sensors_channels'][i]
             content = (float(data[i] == 1.0) if (queue in ["flex0","flex1","flex2"]) else data[i])
 
-            self.logger.debug(f"pushing {content} to {queue}")
             self.redisconn.lpush(queue, content)
-            self.redisconn.ltrim(queue, 0, self.config["data_window_size"] - 1)
+            self.redisconn.ltrim(queue, 0, self.window_size - 1)
 
     def run(self, device_ip: str, polling_interval: float = 2.0):
         """Run the UDP server main loop.
@@ -212,7 +213,7 @@ class LumeServer:
 
                     # Publish values and update the version counter if new full window of data
                     pub_counter += 1
-                    if (pub_counter % self.config["data_window_size"] == 0):
+                    if (pub_counter % self.window_size == 0):
                         self.redisconn.incr(self.config["redis_data_version_channel"])
                         
         except KeyboardInterrupt:

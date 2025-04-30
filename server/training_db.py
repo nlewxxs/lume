@@ -8,6 +8,7 @@ import time
 
 from lume_logger import *
 from config import ENV
+from packer import unpack_binary
 
 # define constants
 USERS_TABLE = "users"
@@ -40,6 +41,7 @@ class TrainingDatabase:
     
         # Check if the USERS table exists: 
         if not self.table_exists(USERS_TABLE):
+
             # Warn if not
             self.logger.info(f"{Fore.CYAN}USERS TABLE HAS NOT BEEN FOUND - CREATING NEW ONE.{Style.RESET_ALL}")
 
@@ -103,17 +105,22 @@ class TrainingDatabase:
 
     def insert_gesture(self, gesture: str, user_id: str, data):
         """Insert a new gesture into the gestures table"""
-        self.cursor.execute(f"""
-        INSERT INTO {GESTURES_TABLE} (gesture, user_id, data)
-        VALUES ('{gesture}', '{user_id}', '{json.dumps(data)}') 
-        """)
-        self.conn.commit()
+        try:
+            self.cursor.execute(f"""
+            INSERT INTO {GESTURES_TABLE} (gesture, user_id, data)
+            VALUES ('{gesture}', '{user_id}', '{json.dumps(data)}') 
+            """)
+            self.conn.commit()
+        except Exception as e:
+            self.logger.error(f"Postgres error: {e}")
+            self.conn.rollback()
 
     def flush_gesture(self, buffer, gesture):
         """Flush the current gesture stored into the training DB"""
         try:
             # Get the current user
             user = self.redisconn.get(ENV["redis_uid_variable"])
+            user = user.decode('utf-8') if isinstance(user, bytes) else user
             self.insert_gesture(gesture, str(user), buffer)
             self.logger.info(f"Recorded {Fore.CYAN}{len(buffer)}{Style.RESET_ALL}" \
                             f" readings as gesture {Fore.CYAN}{gesture.upper()}{Style.RESET_ALL}" \
@@ -132,26 +139,36 @@ class TrainingDatabase:
         self.logger.info(f"Listening for gestures on {channel}")
 
         buffer = []
-        last_message_time = None
+        # Controlled by redis!!
+        record_gesture = False
 
         try:
             while running:
-                msg = sensors_subscription.get_message(ignore_subscribe_messages=True, timeout=0.1)
-                if msg:
-                    try:
-                        data = json.loads(msg['data'])
+                # Check if time to record a gesture (controlled by sockets.py)
+                rg = self.redisconn.get(ENV['redis_record_variable'])
+                record_gesture = (rg.decode('utf-8') if isinstance(rg, bytes) else rg) == '1'
+                recording = False  # Used to only flush gesture once after finishing recording
+
+                while record_gesture:
+                    recording = True
+                    # Update redis-held control variable
+                    rg = self.redisconn.get(ENV['redis_record_variable'])
+                    record_gesture = (rg.decode('utf-8') if isinstance(rg, bytes) else rg) == '1'
+
+                    msg = sensors_subscription.get_message(ignore_subscribe_messages=True, timeout=0.1)
+
+                    if msg:
+                        data = unpack_binary(msg['data'])
                         buffer.append(data)
-                        last_message_time = time.monotonic()
 
-                    except json.JSONDecodeError:
-                        logging.error(f"Invalid message: {msg['data']}")
-
-                # If over 200ms elapsed once you started recording, flush the data into the db
-                if last_message_time and (time.monotonic() - last_message_time > 0.2) and buffer:
+                if recording:
+                    # Flush the data to the db when finished
                     self.flush_gesture(buffer, gesture)
                     buffer.clear()
-                
+                    recording = False
+
                 time.sleep(0.05)
+
         except KeyboardInterrupt:
             logging.info("Shutting down gracefully...")
             running = False

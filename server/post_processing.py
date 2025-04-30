@@ -9,8 +9,7 @@ from locale import windows_locale
 import logging
 import sys
 import redis
-import struct
-import math
+from packer import pack_binary
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
@@ -155,27 +154,11 @@ class DataProcessor:
 
         return mean, m2 / (n - 1)
 
-    def calculate_energy(self, x_in : List[float], y_in : List[float], z_in : List[float]):
+    def calculate_energy(self, x_in : List[float], y_in : List[float], z_in : List[float]) -> float:
         """
         Calculate the energy of a signal over a specified window
         """
         return sum(x**2 + y**2 + z**2 for x, y, z in zip(x_in, y_in, z_in))        
-
-    def pack(self, data : List[float]) -> bytes:
-        """Pack the filtered and post-processed sensor data in to a""" 
-
-        # First pack the values of flex0, flex1 and flex2 into a boolean (these
-        # are passed as 0.0, or 1.0 into the function)
-        flex_byte = 0x0
-        flex_byte |= (0b10000000 if data[:-3] == 1.0 else 0b0)
-        flex_byte |= (0b01000000 if data[:-2] == 1.0 else 0b0)
-        flex_byte |= (0b00100000 if data[:-1] == 1.0 else 0b0)
-
-        data = data[:-3]
-        data.append(flex_byte)
-
-        packed_data = struct.pack('<26fB', *data)
-        return packed_data
 
     def process(self) -> None:
         """
@@ -271,7 +254,7 @@ class DataProcessor:
             sensor_data_packet[28] = signals['flex2'][0]
 
             self.logger.debug(sensor_data_packet)
-            packed = self.pack(sensor_data_packet)
+            packed = pack_binary(sensor_data_packet)
 
             # Publish data window onto sensors channel
             self.redisconn.publish('sensors', packed)
@@ -288,7 +271,6 @@ class DataProcessor:
                 plt.show(block=True)
             else: 
                 self.process()
-                
 
         except KeyboardInterrupt:
             # Warning is already given by other modules, no point repeating

@@ -36,6 +36,9 @@ class LumeServer:
         
         # Setup logging with color
         self._setup_colored_logging(verbose)
+
+        # Set the variable to record gestures as false
+        self.redisconn.set(ENV['redis_record_variable'], 0)
         
         # Initialize socket
         try:
@@ -202,8 +205,12 @@ class LumeServer:
                     # Print 'recording' only if we just started recording
                     if recording and not old_recording:
                         self.logger.info("Recording gesture...")
+                        # Enable recording
+                        self.redisconn.set(ENV['redis_record_variable'], 1)
                     if not recording and old_recording:
                         self.logger.info("Processing gesture...")
+                        # Disable recording
+                        self.redisconn.set(ENV['redis_record_variable'], 0)
 
                     old_recording = recording
                     values, _ = result

@@ -66,7 +66,7 @@ if __name__ == "__main__":
     args = parse_arguments()
 
     # Configure redis instance
-    redisconn = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redisconn = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
 
     # Request the current user's name
     name = input(f"{ORANGE}Please enter your imperial shortcode: {RESET}")
@@ -95,12 +95,12 @@ if __name__ == "__main__":
 
         post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=False, verbose=args.verbose)
         post_proc_thread = threading.Thread(target=post_proc.run, daemon=True)
-        # post_proc_thread.start()
-        post_proc.run()
+        post_proc_thread.start()
+        # post_proc.run()
 
         # Init the database
-        # db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
-        # db.run(gesture)
+        db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
+        db.run(gesture)
 
     elif args.mode == "fft":
         post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=True, verbose=args.verbose)

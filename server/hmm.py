@@ -7,7 +7,6 @@ import psycopg2
 import redis
 import sys
 import numpy as np
-import json
 from hmmlearn import hmm
 
 from lume_logger import *
@@ -18,7 +17,6 @@ class LumeHMM:
         
         self.redisconn = redisconn
         self._setup_colored_logging(verbose)
-
 
         # Variables that may or may not be initialised depending on the system mode
         self.training_data = {}

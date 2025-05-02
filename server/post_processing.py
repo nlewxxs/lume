@@ -5,7 +5,6 @@ includes calculating means, variances and energies. There is also an option to
 do an FFT, as this was required for choosing the appropriate corner frequency
 for the LPFs on the controller side. 
 """
-from locale import windows_locale
 import logging
 import sys
 import redis

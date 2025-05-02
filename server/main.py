@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import argparse
 import threading
 
+from hmm import LumeHMM
 from training_db import TrainingDatabase
 from config import ENV
 
@@ -81,12 +82,12 @@ if __name__ == "__main__":
     set_env_vars(redisconn, args, shortcode)
 
     # Startup a udp endpoint
-    endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, fft=(args.mode == "fft"), \
-                                 verbose=args.verbose)
+    # endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, fft=(args.mode == "fft"), \
+                                 # verbose=args.verbose)
 
     # Run the server
-    endpoint_thread = threading.Thread(target=endpoint.run, daemon=True, args=(args.ip, args.polling_interval))
-    endpoint_thread.start()
+    # endpoint_thread = threading.Thread(target=endpoint.run, daemon=True, args=(args.ip, args.polling_interval))
+    # endpoint_thread.start()
 
     db = None  # this will become the influx DB when deployed
 
@@ -96,7 +97,6 @@ if __name__ == "__main__":
         post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=False, verbose=args.verbose)
         post_proc_thread = threading.Thread(target=post_proc.run, daemon=True)
         post_proc_thread.start()
-        # post_proc.run()
 
         # Init the database
         db = TrainingDatabase(user=shortcode, redisconn=redisconn, verbose=args.verbose)
@@ -106,3 +106,8 @@ if __name__ == "__main__":
         post_proc = post_processing.DataProcessor(redisconn=redisconn, fft=True, verbose=args.verbose)
         post_proc.run()
 
+    elif args.mode == "train":
+        hmm = LumeHMM(redisconn=redisconn, verbose=args.verbose)
+        hmm.load_training_data()
+        hmm.train()
+        hmm.eval()

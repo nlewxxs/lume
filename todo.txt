@@ -1,4 +1,7 @@
-fix mpu drift!
-move all env stuff to an .env file
-separate queries into %s form instead of f strings. 
-dockerise!
+## Cleanup stuff: 
+
+- dockerise!
+- move all env stuff to an .env file
+- separate queries into %s form instead of f strings. 
+- comments and doxygen
+- requirements.txt

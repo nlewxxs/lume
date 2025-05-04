@@ -4,7 +4,7 @@ import psycopg2
 import sys
 import redis
 import json
-import time
+import time 
 
 from lume_logger import *
 from config import ENV
@@ -155,11 +155,12 @@ class TrainingDatabase:
                     rg = self.redisconn.get(ENV['redis_record_variable'])
                     record_gesture = (rg.decode('utf-8') if isinstance(rg, bytes) else rg) == '1'
 
-                    msg = sensors_subscription.get_message(ignore_subscribe_messages=True, timeout=0.1)
+                    msg = sensors_subscription.get_message(ignore_subscribe_messages=True, timeout=0.01)
 
                     if msg:
                         data = unpack_binary(msg['data'])
                         buffer.append(data)
+                        print(data)
 
                 if recording:
                     # Flush the data to the db when finished

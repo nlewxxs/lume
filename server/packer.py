@@ -15,9 +15,9 @@ def pack_binary(data : List[float]) -> bytes:
     # First pack the values of flex0, flex1 and flex2 into a boolean (these
     # are passed as 0.0, or 1.0 into the function)
     flex_byte = 0x0
-    flex_byte |= (0b10000000 if data[:-3] == 1.0 else 0b0)
-    flex_byte |= (0b01000000 if data[:-2] == 1.0 else 0b0)
-    flex_byte |= (0b00100000 if data[:-1] == 1.0 else 0b0)
+    flex_byte |= (0b10000000 if data[-3] == 1.0 else 0b0)
+    flex_byte |= (0b01000000 if data[-2] == 1.0 else 0b0)
+    flex_byte |= (0b00100000 if data[-1] == 1.0 else 0b0)
 
     data = data[:-3]
     data.append(flex_byte)
@@ -61,9 +61,9 @@ def unpack_binary(data : bytes) -> Dict:
             "gy_z_var" :    unpacked[23],
             "acc_energy" :  unpacked[24],
             "gy_energy" :   unpacked[25],
-            "flex0" :   float(unpacked[26] & 0b10000000 != 0),
-            "flex1" :   float(unpacked[26] & 0b01000000 != 0),
-            "flex2" :   float(unpacked[26] & 0b00100000 != 0)
+            "flex0" :   float((unpacked[26] & 0b10000000) != 0),
+            "flex1" :   float((unpacked[26] & 0b01000000) != 0),
+            "flex2" :   float((unpacked[26] & 0b00100000) != 0)
             }
 
     return result

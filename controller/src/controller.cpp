@@ -110,7 +110,7 @@ void loop() {
     read_res = sensors::UpdateMPU6050Readings(
         &pitch, &roll, &yaw, &acc_x, &acc_y, &acc_z, &gyro_x, &gyro_y, &gyro_z);
 
-    delay(5);
+    delay(10);
 
     // handle errors 
     if (std::holds_alternative<int>(read_res)) {
@@ -130,6 +130,7 @@ void loop() {
         // Only attempt print if completely necessary, this slows down the loop
         // a lot and contributes to cloud disconnect 
         // Log.info("pitch = %f, roll = %f, yaw = %f", pitch, roll, yaw);
+        // Log.info("%f | %f | %f", packet_ptr->pitch, packet_ptr->roll, packet_ptr->yaw);
         // Log.info("%d | %d | %d", packet_ptr->flex0, packet_ptr->flex1, packet_ptr->flex2);
     } else {
         Log.error("Failed to read from MPU!");
@@ -141,6 +142,4 @@ void loop() {
         // Handle background callbacks (i.e. cloud conn)
         Particle.process();
     }
-
-    delay(5);
 } 

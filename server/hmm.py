@@ -8,6 +8,7 @@ import redis
 import sys
 import numpy as np
 from hmmlearn import hmm
+from sklearn.preprocessing import StandardScaler
 
 from lume_logger import *
 from config import ENV
@@ -47,12 +48,14 @@ class LumeHMM:
         # }
 
         training_data = {}
+        self.test_data = {}
+
         training_data['takeoff'] = self.get_gesture('takeoff')
         training_data['land'] = self.get_gesture('land')
         training_data['action_1'] = self.get_gesture('action_1')
-        training_data['action_2'] = self.get_gesture('action_2')
+        # training_data['action_2'] = self.get_gesture('action_2')
         training_data['action_3'] = self.get_gesture('action_3')
-
+        
         # Now convert the data such that each sequence = np.ndarray of shape
         # (~200, num_features). The sequence length may vary, this is a
         # strength of HMMs.
@@ -82,11 +85,12 @@ class LumeHMM:
 
             self.training_data[gesture] = np_sequences
 
-        self.training_data['takeoff'] = self.training_data['land']
-        self.training_data['action_1'] = self.training_data['land']
-        self.training_data['action_2'] = self.training_data['land']
-        self.training_data['action_3'] = self.training_data['land']
-        
+        for action in self.training_data:
+            # grab the last 10 to use as test data instead of training
+            self.test_data[action] = self.training_data[action][-10:]
+            # remove from training dataset
+            self.training_data[action] = self.training_data[action][:-10]
+
 
     def train(self): 
         # First check that the training data has been initialised
@@ -95,19 +99,39 @@ class LumeHMM:
             return
 
         self.models = {}
+        scaler = StandardScaler()
         for gesture, sequences in self.training_data.items():
+ 
             X = np.vstack(sequences)
+            # Now scale it
+            X_scaled = scaler.fit_transform(X)
             lengths = [len(seq) for seq in sequences]  # needed for training
 
             # Define a Gaussian HMM
-            model = hmm.GaussianHMM(n_components=5, covariance_type='diag', n_iter=1000)
-            model.fit(X, lengths)
+            model = hmm.GaussianHMM(n_components=4, covariance_type='diag',
+                                    min_covar=1e-3, n_iter=1000)
+
+            model.fit(X_scaled, lengths)
+
             self.models[gesture] = model
 
     def eval(self):
-        sequence = self.training_data['land'][0]
-        scores = {label: model.score(sequence) for label, model in self.models.items()}
-        print(scores)
+        correct = 0
+        total = 0
+        for test_label in self.test_data:
+            for sequence in self.test_data[test_label]:
+                # Scale
+                scaler = StandardScaler()
+                sequence_scaled = scaler.fit_transform(sequence)
+                scores = {label: model.score(sequence_scaled) for label, model in self.models.items()}
+                winner = max(scores, key=scores.get)
+
+                if winner == test_label: 
+                    correct += 1
+
+                total += 1
+
+        print(f"Accuracy: {(correct / total) * 100}%")
 
 
     def get_gesture(self, gesture : str):

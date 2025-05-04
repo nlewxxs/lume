@@ -141,9 +141,10 @@ void PushNewAccelReadings(Vector3& data) {
 
 void PushNewYprReadings(const float &pitch, const float &roll,
                         const float &yaw) {
-    float new_pitch = pitch_lpf.process(pitch);
-    float new_roll = pitch_lpf.process(roll);
-    float new_yaw = pitch_lpf.process(yaw);
+
+    float new_pitch = pitch;
+    float new_roll = roll;
+    float new_yaw = yaw;
 
     // Calculate the deltas first before replacing in packet
     packet.d_pitch = new_pitch - packet.pitch;

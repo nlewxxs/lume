@@ -164,7 +164,8 @@ class LumeServer:
         for i in range(len(data)):
             queue = ENV['redis_sensors_channels'][i]
             content = (float(data[i] == 1.0) if (queue in ["flex0","flex1","flex2"]) else data[i])
-
+            
+            self.logger.debug(f"Publishing {content} to {queue}")
             self.redisconn.lpush(queue, content)
             self.redisconn.ltrim(queue, 0, self.window_size - 1)
 
@@ -214,8 +215,10 @@ class LumeServer:
 
                     old_recording = recording
                     values, _ = result
+                    
+                    if recording: 
+                        self.publish_sensor_data(values)
 
-                    self.publish_sensor_data(values)
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
 
                     # Publish values and update the version counter if new full window of data

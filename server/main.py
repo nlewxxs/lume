@@ -81,13 +81,13 @@ if __name__ == "__main__":
     # Set the environmental variables in Redis
     set_env_vars(redisconn, args, shortcode)
 
-    # Startup a udp endpoint
-    # endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, fft=(args.mode == "fft"), \
-                                 # verbose=args.verbose)
-
-    # Run the server
-    # endpoint_thread = threading.Thread(target=endpoint.run, daemon=True, args=(args.ip, args.polling_interval))
-    # endpoint_thread.start()
+    # Startup a udp endpoint iff we are not training the HMM
+    if args.mode not in ["train", "eval"]:
+        endpoint = sockets.LumeServer(port=args.port, redisconn=redisconn, fft=(args.mode == "fft"), \
+                                 verbose=args.verbose)
+        # Run the server
+        endpoint_thread = threading.Thread(target=endpoint.run, daemon=True, args=(args.ip, args.polling_interval))
+        endpoint_thread.start()
 
     db = None  # this will become the influx DB when deployed
 
@@ -110,4 +110,10 @@ if __name__ == "__main__":
         hmm = LumeHMM(redisconn=redisconn, verbose=args.verbose)
         hmm.load_training_data()
         hmm.train()
+        hmm.save_models()
+    
+    elif args.mode == "eval":
+        hmm = LumeHMM(redisconn=redisconn, verbose=args.verbose)
+        hmm.load_training_data()
+        hmm.load_models()
         hmm.eval()

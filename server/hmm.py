@@ -30,14 +30,15 @@ class LumeHMM:
         self.conn = None
         self.cursor = None
         
-        # Model configuration parameters - these can be tuned
-        self.n_components = 7  # Increased from 5
-        self.covariance_type = 'full'  # Changed from 'diag' to capture correlations
+        # Model config parameters - these can be tuned
+        self.n_components = 7  
+        self.covariance_type = 'full'
         self.n_iter = 2000  # Increased from 1000
-        self.use_pca = True
+        self.use_pca = True  # toggle principal component analysis
         self.pca_components = 15  # Reduce to this many dimensions
         self.feature_selection = True
-        self.k_best_features = 20  # Select top k features
+        # Select top k features to represent each gesture 
+        self.k_best_features = 20  
         
         # Preprocessing options
         self.apply_smoothing = True
@@ -77,7 +78,7 @@ class LumeHMM:
             'gy_x_mean', 'gy_y_mean', 'gy_z_mean',
             'gy_x_var', 'gy_y_var', 'gy_z_var', 
             'acc_energy', 'gy_energy',
-            # 'flex0', 'flex1', 'flex2'
+            # 'flex0', 'flex1', 'flex2' # Flex sensors are obsolete
         ]
         self.feature_keys = keys
 
@@ -131,7 +132,11 @@ class LumeHMM:
         self.logger.info(f"Test data distribution: {test_counts}")
 
     def _apply_smoothing(self, sequence):
-        """Apply moving average smoothing to the sequence"""
+        """
+        Apply moving average smoothing to the sequence, even though it's
+        already being LPF'ed this seemed to help nonetheless. Perhaps the LPF
+        coefficients need to be changed.
+        """
         smoothed = np.zeros_like(sequence)
         window = self.smoothing_window
         half_window = window // 2
@@ -147,6 +152,8 @@ class LumeHMM:
         return smoothed
 
     def train(self): 
+        """Train the Hidden Markov Model"""
+
         # First check that the training data has been initialised
         if not bool(self.training_data):
             self.logger.error("No training data has been loaded!")
@@ -168,7 +175,7 @@ class LumeHMM:
             X = np.vstack(sequences)
             lengths = [len(seq) for seq in sequences]
             
-            # Scale the data
+            # Scale the data (!!important!! do not skip)
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
             self.scalers[gesture] = scaler
@@ -190,7 +197,7 @@ class LumeHMM:
             model = hmm.GaussianHMM(
                 n_components=self.n_components, 
                 covariance_type=self.covariance_type,
-                min_covar=1e-5,  # Lowered to allow more flexibility
+                min_covar=1e-5,  # Lower min covariance corresponds to higher flexibility, proved useful. 
                 n_iter=self.n_iter,
                 random_state=42
             )

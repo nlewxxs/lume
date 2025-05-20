@@ -1,6 +1,11 @@
 ## Cleanup stuff: 
 
 - dockerise!
+- add energy threshold
+- store in redis buffer
+- frontend
+
+
 - move all env stuff to an .env file
 - separate queries into %s form instead of f strings. 
 - comments and doxygen

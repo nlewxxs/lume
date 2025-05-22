@@ -3,6 +3,7 @@
 - dockerise!
 - add energy threshold
 - store in redis buffer
+- add in CRC
 - frontend
 
 

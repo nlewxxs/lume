@@ -1,0 +1,5 @@
+config==0.5.1
+matplotlib==3.10.3
+numpy==2.2.6
+packer==0.1.1
+redis==5.2.1

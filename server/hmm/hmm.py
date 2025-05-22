@@ -16,8 +16,8 @@ from sklearn.feature_selection import SelectKBest, mutual_info_regression
 import joblib
 from collections import Counter
 
-from lume_logger import *
-from config import ENV
+from shared.lume_logger import *
+from shared.config import config
 
 class LumeHMM:
     def __init__(self, redisconn: redis.client.Redis, verbose: bool = False) -> None:
@@ -49,11 +49,11 @@ class LumeHMM:
         # only done if we are loading training data, since we don't want to
         # call this every time the system is being deployed. 
         self.conn = psycopg2.connect(
-            database=ENV["pg_db_name"],
-            host=ENV["pg_db_host"],
-            user=ENV["pg_db_user"],
-            password=ENV["pg_db_pass"],
-            port=ENV["pg_db_port"]
+            database=config.PG_DB_NAME,
+            host=config.PG_DB_HOST,
+            user=config.PG_DB_USER,
+            password=config.PG_DB_PASS,
+            port=config.PG_DB_PORT
         )
 
         self.cursor = self.conn.cursor()
@@ -520,3 +520,12 @@ class LumeHMM:
         
         if not COLORS_AVAILABLE:
             self.logger.warning("colorama not installed. For colored logs, install with: pip install colorama")
+
+if __name__ == "__main__":
+
+    redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
+    hmm = LumeHMM(redisconn=redisconn, verbose=config.LUME_VERBOSE)
+    hmm.load_training_data()
+    hmm.load_models()
+    hmm.eval()
+

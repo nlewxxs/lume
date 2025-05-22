@@ -286,7 +286,6 @@ class DataProcessor:
             pass
 
 if __name__ == "__main__":
-
     redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
     is_fft = (config.LUME_RUN_MODE == "fft")
     post_proc = DataProcessor(redisconn=redisconn, fft=is_fft, verbose=config.LUME_VERBOSE)

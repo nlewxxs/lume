@@ -159,6 +159,8 @@ class LumeHMM:
             self.logger.error("No training data has been loaded!")
             return
 
+        self.logger.warning("HMM is set to train - THIS WILL OVERRIDE PREVIOUS MODELS")
+
         self.models = {}
         self.scalers = {}
         self.feature_selectors = {}
@@ -521,11 +523,24 @@ class LumeHMM:
         if not COLORS_AVAILABLE:
             self.logger.warning("colorama not installed. For colored logs, install with: pip install colorama")
 
+    def deploy(self):
+        self.logger.info("HMM deploying for live gesture recognition...")
+        ...
+
 if __name__ == "__main__":
 
     redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
-    hmm = LumeHMM(redisconn=redisconn, verbose=config.LUME_VERBOSE)
-    hmm.load_training_data()
-    hmm.load_models()
-    hmm.eval()
 
+    hmm = LumeHMM(redisconn=redisconn, verbose=config.LUME_VERBOSE)
+
+    if config.LUME_RUN_MODE == "eval":
+        hmm.load_training_data()
+        hmm.load_models()
+        hmm.eval()
+    elif config.LUME_RUN_MODE == "train":
+        hmm.load_training_data()
+        hmm.train()
+        hmm.save_models()
+    else:
+        # Assume we are in deployment mode
+        hmm.deploy()

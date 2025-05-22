@@ -11,15 +11,18 @@ import struct
 import keyboard
 import redis
 
-from config import ENV
-from lume_logger import *
+from shared.lume_logger import *
+from shared.config import config
 from typing import Tuple, Optional, List
 
+REDIS_SENSORS_CHANNELS = ['pitch', 'roll', 'yaw', 'd_pitch', 'd_roll', 'd_yaw',
+                          'acc_x', 'acc_y', 'acc_z', 'gy_x', 'gy_y', 'gy_z',
+                          'flex0', 'flex1', 'flex2']
 
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
-    def __init__(self, redisconn: redis.client.Redis, port: int = 8888, fft: bool = False, verbose: bool = False):
+    def __init__(self, redisconn: redis.client.Redis, port: int = 8888, verbose: bool = False):
         """Initialise the UDP server.
         
         Args:
@@ -28,17 +31,16 @@ class LumeServer:
         """
         self.port = port
         self.redisconn = redisconn
-        self.config = ENV
 
         # Extract the run mode straight away
-        self.mode = redisconn.get(ENV["redis_mode_variable"])
-        self.window_size = ENV["fft_data_window_size"] if fft else ENV["normal_data_window_size"]
+        self.mode = redisconn.get(config.LUME_RUN_MODE)
+        self.window_size = config.LUME_FFT_DATA_WINDOW_SIZE if self.mode == 'fft' else config.LUME_DEPLOY_DATA_WINDOW_SIZE
         
         # Setup logging with color
         self._setup_colored_logging(verbose)
 
         # Set the variable to record gestures as false
-        self.redisconn.set(ENV['redis_record_variable'], 0)
+        self.redisconn.set(config.REDIS_RECORD_VARIABLE, 0)
         
         # Initialize socket
         try:
@@ -83,7 +85,7 @@ class LumeServer:
         Returns:
             List of float values, plus 3 booleans at the end
         """
-        payload_size = self.config["payload_size"]
+        payload_size = config.LUME_SENSOR_PAYLOAD_SIZE
 
         if len(data) == payload_size:
             # Unpack 12 floats (IEEE 754 format, network byte order)
@@ -127,7 +129,7 @@ class LumeServer:
             self.logger.info(f"Connection established with {addr}")
             
             # Try to decode as floats if it looks like float data
-            if len(data) >= self.config["payload_size"]:  # At least payload size
+            if len(data) >= config.LUME_SENSOR_PAYLOAD_SIZE:  # At least payload size
                 values = self.unpack(data)
                 if values:
                     self.logger.info(f"Received initial values: {values}")
@@ -162,7 +164,7 @@ class LumeServer:
         so that it can be post-processed"""
 
         for i in range(len(data)):
-            queue = ENV['redis_sensors_channels'][i]
+            queue = REDIS_SENSORS_CHANNELS[i]
             content = (float(data[i] == 1.0) if (queue in ["flex0","flex1","flex2"]) else data[i])
             
             self.logger.debug(f"Publishing {content} to {queue}")
@@ -207,11 +209,11 @@ class LumeServer:
                     if recording and not old_recording:
                         self.logger.info("Recording gesture...")
                         # Enable recording
-                        self.redisconn.set(ENV['redis_record_variable'], 1)
+                        self.redisconn.set(config.REDIS_RECORD_VARIABLE, 1)
                     if not recording and old_recording:
                         self.logger.info("Processing gesture...")
                         # Disable recording
-                        self.redisconn.set(ENV['redis_record_variable'], 0)
+                        self.redisconn.set(config.REDIS_RECORD_VARIABLE, 0)
 
                     old_recording = recording
                     values, _ = result
@@ -224,7 +226,7 @@ class LumeServer:
                     # Publish values and update the version counter if new full window of data
                     pub_counter += 1
                     if (pub_counter % self.window_size == 0):
-                        self.redisconn.incr(self.config["redis_data_version_channel"])
+                        self.redisconn.incr(config.REDIS_DATA_VERSION_CHANNEL)
                         
         except KeyboardInterrupt:
             self.logger.warning("Received keyboard interrupt, shutting down...")
@@ -233,4 +235,12 @@ class LumeServer:
                 self.sock.close()
                 self.logger.info("Socket closed")
 
+if __name__ == "__main__":
+    
+    redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
+
+    endpoint = LumeServer(port=config.LUME_UDP_PORT, redisconn=redisconn,
+                          verbose=config.LUME_VERBOSE)
+
+    endpoint.run(device_ip=config.LUME_CONTROLLER_IP)
 

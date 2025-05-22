@@ -8,18 +8,22 @@ for the LPFs on the controller side.
 import logging
 import sys
 import redis
-from packer import pack_binary
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+
+from shared.packer import pack_binary
+from shared.lume_logger import *
+from shared.config import config
 from typing import Tuple, List
+
 import zlib
 
-from config import ENV
-from lume_logger import *
-
+REDIS_SENSORS_CHANNELS = ['pitch', 'roll', 'yaw', 'd_pitch', 'd_roll', 'd_yaw',
+                          'acc_x', 'acc_y', 'acc_z', 'gy_x', 'gy_y', 'gy_z',
+                          'flex0', 'flex1', 'flex2']
 
 class DataProcessor:
     def __init__(self, redisconn: redis.client.Redis, fft: bool = False, verbose: bool = False):
@@ -29,14 +33,13 @@ class DataProcessor:
             verbose: Enable debug-level logging if True
         """
         self.redisconn = redisconn 
-        self.config = ENV
         self.do_fft = fft
-        self.mode = redisconn.get(ENV["redis_mode_variable"])
+        self.mode = redisconn.get(config.LUME_RUN_MODE)
         self._setup_colored_logging(verbose)
-        self.window_size = ENV["fft_data_window_size"] if fft else ENV["normal_data_window_size"]
+        self.window_size = config.LUME_FFT_DATA_WINDOW_SIZE if fft else config.LUME_DEPLOY_DATA_WINDOW_SIZE
 
         if fft:
-            self.sampling_rate = self.config["sampling_rate"]
+            self.sampling_rate = config.LUME_SAMPLING_RATE
             self.T = 1 / self.sampling_rate
             self.N = self.window_size
 
@@ -96,7 +99,7 @@ class DataProcessor:
         readings. This is displayed in a live window, updating roughly every
         ~16 seconds (for a batch of 1024 readings per window)"""
 
-        current_version = self.redisconn.get(self.config['redis_data_version_channel'])
+        current_version = self.redisconn.get(config.REDIS_DATA_VERSION_CHANNEL)
         if current_version == self.last_seen or current_version == None:
             return self.lines
 
@@ -194,11 +197,18 @@ class DataProcessor:
                 continue  # loop until new data
         
             signals = {}
-            for key in self.config["redis_sensors_channels"]:
-                raw = self.redisconn.lrange(key, 0, -1)
-                if not raw or len(raw) < self.window_size:
-                    continue  # wait until required amount
-                signals[key] = np.array([float(x) for x in raw])
+            got_full_data_set = False
+
+            # This loops until we get a whole set of valid readings - if any of
+            # the sensor readings is bogus, you want to drop the whole set. 
+            while not got_full_data_set:
+                got_full_data_set = True
+                for key in REDIS_SENSORS_CHANNELS:
+                    raw = self.redisconn.lrange(key, 0, -1)
+                    if not raw or len(raw) < self.window_size:
+                        got_full_data_set = False
+                        continue  # wait until required amount
+                    signals[key] = np.array([float(x) for x in raw])
 
             # To preserve order, we keep the indexing as per the docstring at
             # the top of this function
@@ -275,4 +285,9 @@ class DataProcessor:
             # Warning is already given by other modules, no point repeating
             pass
 
+if __name__ == "__main__":
 
+    redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
+    is_fft = (config.LUME_RUN_MODE == "fft")
+    post_proc = DataProcessor(redisconn=redisconn, fft=is_fft, verbose=config.LUME_VERBOSE)
+    post_proc.run()

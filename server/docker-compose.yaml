@@ -1,0 +1,30 @@
+services:
+  redis:
+    image: redis:7
+    container_name: redis
+    ports: 
+      - "6379:6379"
+
+  sockets:
+    depends_on: [redis]
+    build: 
+      context: .
+      dockerfile: sockets/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - LUME_RUN_MODE=${LUME_RUN_MODE}
+      - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
+      - LUME_VERBOSE=${LUME_VERBOSE}
+
+  postprocessing:
+    depends_on: [redis]
+    build: 
+      context: .
+      dockerfile: postprocessing/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - LUME_RUN_MODE=${LUME_RUN_MODE}
+      - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
+      - LUME_VERBOSE=${LUME_VERBOSE}

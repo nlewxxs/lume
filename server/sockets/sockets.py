@@ -8,7 +8,6 @@ import time
 import logging
 import sys
 import struct
-import keyboard
 import redis
 
 from shared.lume_logger import *
@@ -202,7 +201,8 @@ class LumeServer:
                         self.logger.warning("Connection lost, returning to polling mode")
                         break
 
-                    recording = keyboard.is_pressed("shift")
+                    # TODO: DATA COLLECTION
+                    recording = False
                     log_colour = Fore.MAGENTA if recording else Fore.WHITE
 
                     # Print 'recording' only if we just started recording

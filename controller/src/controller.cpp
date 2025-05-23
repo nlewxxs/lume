@@ -91,7 +91,7 @@ void setup() {
     Serial.begin(9600);
 
     strip.begin();
-    strip.setBrightness(48);
+    strip.setBrightness(96);
     strip.show(); // Initialize all pixels to 'off'
 
     // Wait for cloud connection

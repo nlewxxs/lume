@@ -66,6 +66,7 @@ static unsigned long lastUpdate = 0;
 // Define colours
 static constexpr std::array<uint8_t, 3> purple {128, 0, 128};
 static constexpr std::array<uint8_t, 3> cyan {0, 128, 128};
+static constexpr std::array<uint8_t, 3> green {0, 128, 0};
 }
 
 // Prototypes for local build, ok to leave in for Build IDE
@@ -84,6 +85,14 @@ void loading(const std::array<uint8_t, 3> &colour) {
         delay(100);
     }
     delay(20);
+}
+
+void neopixel_constant(const std::array<uint8_t, 3> &colour) {
+    uint16_t i;
+    for(i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, colour[0], colour[1], colour[2]);
+        strip.show();
+    }
 }
 
 void setup() {
@@ -140,11 +149,12 @@ void setup() {
 
     Particle.publish("CONTROLLER INITIALISED");
     Log.info("Controller successfully initialised");
+
+    neopixel_constant(green);
 }
 
 void loop() {
 
-    loading(cyan);
     // We optimistically assume that nothing can go wrong with flex sensors
     // apart from a physical wiring issue
     sensors::UpdateFlexSensors(&flex0, &flex1, &flex2);

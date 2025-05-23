@@ -42,3 +42,15 @@ services:
       - LUME_RUN_MODE=${LUME_RUN_MODE}
       - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
       - LUME_VERBOSE=${LUME_VERBOSE}
+
+  db:
+    depends_on: [redis]
+    build: 
+      context: .
+      dockerfile: db/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - LUME_RUN_MODE=${LUME_RUN_MODE}
+      - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
+      - LUME_VERBOSE=${LUME_VERBOSE}

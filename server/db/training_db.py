@@ -6,9 +6,9 @@ import redis
 import json
 import time 
 
-from lume_logger import *
-from config import ENV
-from packer import unpack_binary
+from shared.lume_logger import *
+from shared.config import config
+from shared.packer import unpack_binary
 
 # define constants
 USERS_TABLE = "users"
@@ -23,11 +23,11 @@ class TrainingDatabase:
     def __init__(self, user: str, redisconn: redis.client.Redis, verbose: bool = False) -> None:
         # Establish connection
         self.conn = psycopg2.connect(
-            database=ENV["pg_db_name"],
-            host=ENV["pg_db_host"],
-            user=ENV["pg_db_user"],
-            password=ENV["pg_db_pass"],
-            port=ENV["pg_db_port"]
+            database=config.PG_DB_NAME,
+            host=config.PG_DB_HOST,
+            user=config.PG_DB_USER,
+            password=config.PG_DB_PASS,
+            port=config.PG_DB_PORT
         )
 
         # Init cursor
@@ -119,7 +119,7 @@ class TrainingDatabase:
         """Flush the current gesture stored into the training DB"""
         try:
             # Get the current user
-            user = self.redisconn.get(ENV["redis_uid_variable"])
+            user = self.redisconn.get(config.REDIS_UID_VARIABLE)
             user = user.decode('utf-8') if isinstance(user, bytes) else user
             self.insert_gesture(gesture, str(user), buffer)
             self.logger.info(f"Recorded {Fore.CYAN}{len(buffer)}{Style.RESET_ALL}" \
@@ -145,14 +145,14 @@ class TrainingDatabase:
         try:
             while running:
                 # Check if time to record a gesture (controlled by sockets.py)
-                rg = self.redisconn.get(ENV['redis_record_variable'])
+                rg = self.redisconn.get(config.REDIS_RECORD_VARIABLE)
                 record_gesture = (rg.decode('utf-8') if isinstance(rg, bytes) else rg) == '1'
                 recording = False  # Used to only flush gesture once after finishing recording
 
                 while record_gesture:
                     recording = True
                     # Update redis-held control variable
-                    rg = self.redisconn.get(ENV['redis_record_variable'])
+                    rg = self.redisconn.get(config.REDIS_RECORD_VARIABLE)
                     record_gesture = (rg.decode('utf-8') if isinstance(rg, bytes) else rg) == '1'
 
                     msg = sensors_subscription.get_message(ignore_subscribe_messages=True, timeout=0.01)
@@ -211,3 +211,10 @@ class TrainingDatabase:
         self.conn.commit()
         self.cursor.close()
         self.conn.close()
+
+if __name__ == "__main__":
+
+    redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
+
+    db = TrainingDatabase(user="nl621", redisconn=redisconn, verbose=config.LUME_VERBOSE)
+    db.run("action_1")

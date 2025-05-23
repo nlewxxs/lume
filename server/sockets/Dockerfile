@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8888/udp
 
-CMD ["python", "sockets.py"]
+CMD ["python", "-u", "sockets.py"]

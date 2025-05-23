@@ -10,8 +10,6 @@ namespace {
 UDP udp;
 // Ports on which config will be broadcast to
 static constexpr unsigned int kUdpPort = 8888;
-static constexpr unsigned int kTcpRxPort = 8889;
-static constexpr unsigned int kTcpTxPort = 8890;
 static constexpr std::size_t kPayloadSize = 49; // size of sensor data payload in bytes
 // Maximum number of attempts to listen to config for
 static constexpr int kMaxAttempts = 100;

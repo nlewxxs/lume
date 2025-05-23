@@ -3,6 +3,7 @@ import { AlertTriangle, Power, Settings, RefreshCw, Send, X } from 'lucide-react
 
 function App() {
   // State management
+  const [isLoaded, setIsLoaded] = useState(false);
   const [inputData, setInputData] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [metrics, setMetrics] = useState({
@@ -22,6 +23,9 @@ function App() {
 
   // Simulated Redis connection and subscription
   useEffect(() => {
+    // Set loaded state after a brief delay to ensure CSS is applied
+    setTimeout(() => setIsLoaded(true), 100);
+    
     // Simulate Redis connection
     setConnectionStatus('connecting');
     
@@ -137,7 +141,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
+    <div className={`min-h-screen bg-gray-900 text-white p-6 transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">LUME</h1>

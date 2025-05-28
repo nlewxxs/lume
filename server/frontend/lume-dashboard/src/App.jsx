@@ -15,6 +15,7 @@ function App() {
         lastUpdate: new Date().toLocaleTimeString()
     });
     const [warnings, setWarnings] = useState([]);
+    const [errors, setErrors] = useState([]);
     const [logs, setLogs] = useState([]);
 
     // Refs for simulated Redis connection
@@ -91,6 +92,16 @@ function App() {
         }, 5000);
     };
 
+    const showError = (message) => {
+        const error = {
+            id: Date.now(),
+            message,
+            timestamp: new Date().toLocaleTimeString()
+        };
+        setErrors(prev => [...prev, error]);
+    };
+
+
     const publishToRedis = (data) => {
         const payload = {
             data,
@@ -114,7 +125,7 @@ function App() {
     const handleEmergencyStop = () => {
         publishToRedis({ command: 'emergency_stop' });
         addLog('EMERGENCY STOP activated');
-        showWarning('Emergency stop activated!');
+        showError('VERY BAD CRITICAL ERROR')
     };
 
     const handleReset = () => {
@@ -129,6 +140,10 @@ function App() {
 
     const dismissWarning = (warningId) => {
         setWarnings(prev => prev.filter(w => w.id !== warningId));
+    };
+
+    const dismissError = (errorId) => {
+        setErrors(prev => prev.filter(w => w.id !== errorId));
     };
 
     return (
@@ -149,7 +164,7 @@ function App() {
 
             {/* Warning Popups */}
             {warnings.map(warning => (
-                <div key={warning.id} className="fixed top-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
+                <div key={warning.id} className="fixed bottom-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
                     <div className="flex items-start gap-2">
                         <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
@@ -162,6 +177,30 @@ function App() {
                             className="text-red-200 hover:text-white"
                         >
                             <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            ))}
+
+
+            {/* Critical Error Popups */}
+            {errors.map(error => (
+                <div
+                    key={error.id}
+                    className="fixed left-20 right-20 top-50 bottom-50 z-50 rounded-xl border-4 border-red-500 flex items-center justify-center bg-[rgba(185,28,28,0.9)] text-white p-8"
+                >
+                    <div className="text-center max-w-3xl">
+                        <div className="text-6xl font-extrabold mb-4 flex justify-center items-center gap-4">
+                            <AlertTriangle className="w-12 h-12" />
+                            WARNING
+                        </div>
+                        <div className="text-4xl mb-2">{error.message}</div>
+                        <div className="text-xl text-red-200 mb-6">{error.timestamp}</div>
+                        <button
+                            onClick={() => dismissError(error.id)}
+                            className="mt-4 px-6 py-3 bg-white text-red-700 text-xl font-bold rounded-lg hover:bg-red-100 transition"
+                        >
+                            Dismiss
                         </button>
                     </div>
                 </div>

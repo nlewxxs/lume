@@ -6,6 +6,7 @@ function App() {
     const [isLoaded, setIsLoaded] = useState(false);
     const [droneConnStatus, setDroneConnStatus] = useState('disconnected');
     const [controllerConnStatus, setControllerConnStatus] = useState('disconnected');
+    const [serverStatus, setServerStatus] = useState('disconnected');
     const [metrics, setMetrics] = useState({
         temperature: 25.4,
         pressure: 1013.25,
@@ -153,11 +154,10 @@ function App() {
                 <h1 className="text-3xl font-bold mb-2">LUME</h1>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-full ${droneConnStatus === 'connected' ? 'bg-green-500' :
-                            controllerConnStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                        <div className={`w-4 h-4 rounded-full ${navigator.onLine ? 'bg-green-500' : 'bg-red-500'
                             }`}></div>
-                        <span className="text-sm text-gray-400">Network - {droneConnStatus}</span>
-                        <Wifi className="w-4 h-4 text-gray-400"/>
+                        <span className="text-sm text-gray-400">Network - {navigator.onLine ? 'Connected' : 'Disconnected'}</span>
+                        <Wifi className="w-4 h-4 text-gray-400" />
                     </div>
                 </div>
             </div>

@@ -18,6 +18,12 @@ REDIS_SENSORS_CHANNELS = ['pitch', 'roll', 'yaw', 'd_pitch', 'd_roll', 'd_yaw',
                           'acc_x', 'acc_y', 'acc_z', 'gy_x', 'gy_y', 'gy_z',
                           'flex0', 'flex1', 'flex2']
 
+CONTROL_SIGNAL_LENGTH = 5  # 5 bytes, consisting of LUME and then a number
+
+# Custom exception for receiving invalid control commands from the controller
+class InvalidControlCommand(Exception):
+    pass
+
 class LumeServer:
     """UDP Server that receives binary float data from a microcontroller."""
     
@@ -105,6 +111,8 @@ class LumeServer:
             self.logger.warning(f"Received more data than expected: {len(data)} bytes")
             # Still try to parse the first 12 floats
             return list(struct.unpack('<12f', data[:payload_size]))
+        elif len(data) == CONTROL_SIGNAL_LENGTH:
+            return 
         else:
             self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {payload_size}")
             return []
@@ -147,13 +155,32 @@ class LumeServer:
         """
         try:
             data, addr = self.sock.recvfrom(1024)
-            values = self.unpack(data)
-            
-            if values:
-                return values, addr
+            if len(data) == config.LUME_SENSOR_PAYLOAD_SIZE:
+                values = self.unpack(data)
+                if values:
+                    return values, addr
+                else:
+                    return None
+
+            # Not the best way of doing this but we mimic the return type this
+            # way, dictating which control signal was received. 
+            elif len(data) == CONTROL_SIGNAL_LENGTH:
+                command_str = data.decode('utf-8')
+                if command_str[-1] == "0":
+                    return [0.0], addr
+                elif command_str[-1] == "1":
+                    return [1.0], addr
+                elif command_str[-1] == "2":
+                    return [2.0], addr
+                elif command_str[-1] == "3":
+                    return [3.0], addr
+                else:
+                    self.logger.warning(f"Invalid control command << {command_str} >> received!")
+                    raise(InvalidControlCommand)
             else:
                 return None
-                
+            
+                            
         except (socket.timeout, TimeoutError):
             self.logger.warning("Receive operation timed out")
             return None
@@ -188,6 +215,9 @@ class LumeServer:
                     if not connected:
                         self.logger.info(f"Retrying in {polling_interval} seconds...")
                         time.sleep(polling_interval)
+
+                # Get the run mode
+                run_mode = str(self.redisconn.get(config.LUME_RUN_MODE)).lower()
                 
                 # Process incoming data until connection is lost
                 self.logger.debug("Entering data reception mode")
@@ -195,7 +225,10 @@ class LumeServer:
                 pub_counter = 0
 
                 while True:
-                    result = self.receive_data()
+                    try:
+                        result = self.receive_data()
+                    except InvalidControlCommand:
+                        continue
 
                     if result is None:
                         self.logger.warning("Connection lost, returning to polling mode")
@@ -218,8 +251,18 @@ class LumeServer:
                     old_recording = recording
                     values, _ = result
                     
-                    if recording: 
-                        self.publish_sensor_data(values)
+                    # If the system is running in deployment mode, publish the
+                    # sensor data regardless. Else, only publish while the
+                    # shift key is pressed. 
+
+                    # TODO: shift key is deprecated as of dockerising, this
+                    # will be replaced by a redis variable set by the frontend. 
+
+                    if len(values) == config.LUME_SENSOR_PAYLOAD_SIZE:
+                        if recording or run_mode == "deploy": 
+                            self.publish_sensor_data(values)
+                    elif len(values) == 1:
+                        self.logger.info(f"Received control signal: {values[0]}")
 
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
 

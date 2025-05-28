@@ -216,5 +216,11 @@ if __name__ == "__main__":
 
     redisconn = redis.Redis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=0, decode_responses=False)
 
-    db = TrainingDatabase(user="nl621", redisconn=redisconn, verbose=config.LUME_VERBOSE)
-    db.run("action_1")
+    # Get the run mode, only spin up the database if we are going to be recording gestures
+
+    run_mode = str(redisconn.get(config.LUME_RUN_MODE)).lower()
+
+    if run_mode == "data":
+        db = TrainingDatabase(user="nl621", redisconn=redisconn, verbose=config.LUME_VERBOSE)
+        # TODO: set correct action based on frontend
+        db.run("action_1")

@@ -17,7 +17,6 @@ class Config:
     LUME_VERBOSE: bool = os.getenv('LUME_VERBOSE', 'false').lower() == 'true'
     LUME_UDP_PORT: int = int(os.getenv('LUME_UDP_PORT', '8888'))
     LUME_CONTROLLER_IP: str = os.getenv('LUME_CONTROLLER_IP', 'localhost')
-    print(LUME_CONTROLLER_IP)
     LUME_SENSOR_PAYLOAD_SIZE: int = int(os.getenv('LUME_SENSOR_PAYLOAD_SIZE', '49'))
     LUME_FFT_DATA_WINDOW_SIZE: int = int(os.getenv('LUME_FFT_DATA_WINDOW_SIZE', '1024'))
     LUME_DEPLOY_DATA_WINDOW_SIZE: int = int(os.getenv('LUME_DEPLOY_DATA_WINDOW_SIZE', '48'))

@@ -111,8 +111,6 @@ class LumeServer:
             self.logger.warning(f"Received more data than expected: {len(data)} bytes")
             # Still try to parse the first 12 floats
             return list(struct.unpack('<12f', data[:payload_size]))
-        elif len(data) == CONTROL_SIGNAL_LENGTH:
-            return 
         else:
             self.logger.warning(f"Incomplete data received: {len(data)} bytes, expected {payload_size}")
             return []
@@ -133,15 +131,15 @@ class LumeServer:
             
             # Wait for any response
             data, addr = self.sock.recvfrom(1024)
-            self.logger.info(f"Connection established with {addr}")
             
             # Try to decode as floats if it looks like float data
             if len(data) >= config.LUME_SENSOR_PAYLOAD_SIZE:  # At least payload size
                 values = self.unpack(data)
                 if values:
-                    self.logger.info(f"Received initial values: {values}")
+                    self.logger.info(f"Connection established with {addr}")
+                    return True
             
-            return True
+            return False
                 
         except (socket.timeout, TimeoutError):
             self.logger.warning("Connection timed out during polling")
@@ -155,7 +153,9 @@ class LumeServer:
         """
         try:
             data, addr = self.sock.recvfrom(1024)
-            if len(data) == config.LUME_SENSOR_PAYLOAD_SIZE:
+            if (len(data)) == 1:
+                print(data)
+            elif len(data) == config.LUME_SENSOR_PAYLOAD_SIZE:
                 values = self.unpack(data)
                 if values:
                     return values, addr
@@ -197,6 +197,23 @@ class LumeServer:
             self.redisconn.lpush(queue, content)
             self.redisconn.ltrim(queue, 0, self.window_size - 1)
 
+    def handle_control_signal(self, control_code: int) -> None:
+        """
+        Handle the control signal sent by the controller and update the
+        relevant Redis variable / topic 
+        """
+        if control_code == 0:  # ESTOP
+            # Doesn't matter what we publish, we setup a callback in each module to listen to this
+            self.redisconn.publish("ESTOP", "ESTOP")
+        elif control_code == 1:  # Set the flight mode to manual
+            self.redisconn.set("flight_mode", "manual")
+        elif control_code == 2:  # Set the flight mode to gesture
+            self.redisconn.set("flight_mode", "gesture")
+        elif control_code == 3:  # Indicate a hardware failure
+            # Note that if the system reaches this state, it cannot escape it
+            # without a restart that can be triggered in the frontend. 
+            self.redisconn.set("controller_status", "hardware_failure")
+
     def run(self, device_ip: str, polling_interval: float = 2.0):
         """Run the UDP server main loop.
         
@@ -210,15 +227,18 @@ class LumeServer:
             while True:
                 # Try to establish/re-establish connection
                 connected = False
+                self.redisconn.set("controller_status", "disconnected")
+
                 while not connected:
                     connected = self.poll_device(device_ip)
                     if not connected:
                         self.logger.info(f"Retrying in {polling_interval} seconds...")
                         time.sleep(polling_interval)
 
-                # Get the run mode
-                run_mode = str(self.redisconn.get(config.LUME_RUN_MODE)).lower()
-                
+                self.redisconn.set("controller_status", "connected")
+                # IMPORTANT set the default mode to gesture
+                self.redisconn.set("flight_mode", "gesture")  
+
                 # Process incoming data until connection is lost
                 self.logger.debug("Entering data reception mode")
                 old_recording = False
@@ -259,10 +279,11 @@ class LumeServer:
                     # will be replaced by a redis variable set by the frontend. 
 
                     if len(values) == config.LUME_SENSOR_PAYLOAD_SIZE:
-                        if recording or run_mode == "deploy": 
+                        if recording or config.LUME_RUN_MODE == "deploy": 
                             self.publish_sensor_data(values)
                     elif len(values) == 1:
                         self.logger.info(f"Received control signal: {values[0]}")
+                        self.handle_control_signal(int(values[0]))
 
                     self.logger.debug(f"{log_colour}Received values {values} {Style.RESET_ALL}")
 

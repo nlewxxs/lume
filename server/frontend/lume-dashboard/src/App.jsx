@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, Power, RefreshCw, X, ShieldAlert, Wifi, Joystick, ServerCog, Radar} from 'lucide-react';
+import { AlertTriangle, Power, RefreshCw, X, Wifi, WifiOff, Joystick} from 'lucide-react';
 
 function App() {
     // State management
@@ -157,7 +157,7 @@ function App() {
                         <div className={`w-4 h-4 rounded-full ${navigator.onLine ? 'bg-green-500' : 'bg-red-500'
                             }`}></div>
                         <span className="text-sm text-gray-400">Network - {navigator.onLine ? 'Connected' : 'Disconnected'}</span>
-                        <Wifi className="w-4 h-4 text-gray-400" />
+                        {navigator.onLine ? <Wifi className="w-4 h-4 text-gray-400" /> : <WifiOff className="w-4 h-4 text-gray-400" />}
                     </div>
                 </div>
             </div>
@@ -214,7 +214,7 @@ function App() {
                     {/* Activity Log */}
                     <div className="bg-gray-800 rounded-lg p-6">
                         <h2 className="text-xl font-semibold mb-4">Activity Log</h2>
-                        <div className="bg-gray-900 rounded-lg p-4 h-88 overflow-y-auto">
+                        <div className="bg-gray-900 rounded-lg p-4 bottom-4 overflow-y-auto">
                             {logs.length === 0 ? (
                                 <div className="text-gray-500 text-sm">No activity yet...</div>
                             ) : (

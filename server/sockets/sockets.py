@@ -179,7 +179,6 @@ class LumeServer:
                     raise(InvalidControlCommand)
             else:
                 return None
-            
                             
         except (socket.timeout, TimeoutError):
             self.logger.warning("Receive operation timed out")

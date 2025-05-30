@@ -8,13 +8,14 @@ WORKDIR /app/lume-dashboard
 
 # Install dependencies, including Vite
 RUN npm install
-RUN npm install -D tailwindcss postcss autoprefixer @tailwindcss/vite
+RUN npm install -D autoprefixer @tailwindcss/vite concurrently
 RUN npm install lucide-react
 
-# Expose the port
-EXPOSE 5173
+# Expose the ports for Redis and the WS server
+EXPOSE 5173  
+EXPOSE 4000
 
 # Start npm server with Vite
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start:docker"]
 
 

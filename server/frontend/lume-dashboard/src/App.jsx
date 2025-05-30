@@ -22,6 +22,41 @@ function App() {
     // Refs for simulated Redis connection
     const metricsInterval = useRef(null);
 
+    useEffect(() => {
+        let ws;
+        let retryTimeout;
+
+        const connectWebSocket = () => {
+            console.log("Attempting to initialise websocket connection");
+            ws = new WebSocket(`ws://${window.location.hostname}:4000`);
+
+            ws.onopen = () => {
+                console.log('✅ WebSocket connected');
+            };
+
+            ws.onmessage = event => {
+                showError("CONTROLLER TRIGGERED ESTOP");
+            };
+
+            ws.onerror = err => {
+                console.error('❌ WebSocket error:', err);
+            };
+
+            ws.onclose = () => {
+                console.warn('⚠️ WebSocket closed, retrying in 1s...');
+                retryTimeout = setTimeout(connectWebSocket, 1000);
+            };
+        };
+
+        connectWebSocket();
+
+        return () => {
+            clearTimeout(retryTimeout);
+            if (ws) ws.close();
+        };
+    }, []);
+
+
     // Simulated Redis connection and subscription
     useEffect(() => {
         // Set loaded state after a brief delay to ensure CSS is applied
@@ -126,7 +161,7 @@ function App() {
     const handleEmergencyStop = () => {
         publishToRedis({ command: 'emergency_stop' });
         addLog('EMERGENCY STOP activated');
-        showError('VERY BAD CRITICAL ERROR')
+        showError('YOU MESSED UP BAD')
     };
 
     const handleReset = () => {
@@ -187,12 +222,12 @@ function App() {
             {errors.map(error => (
                 <div
                     key={error.id}
-                    className="fixed left-20 right-20 top-50 bottom-50 z-50 rounded-xl border-4 border-red-500 flex items-center justify-center bg-[rgba(185,28,28,0.9)] text-white p-8"
+                    className="fixed left-20 right-20 top-50 bottom-50 z-50 rounded-3xl border-4 border-red-500 flex items-center justify-center bg-[rgba(255,28,28,0.9)] text-white p-8"
                 >
                     <div className="text-center max-w-3xl">
                         <div className="text-6xl font-extrabold mb-4 flex justify-center items-center gap-4">
                             <AlertTriangle className="w-12 h-12" />
-                            WARNING
+                            CRITICAL ERROR
                         </div>
                         <div className="text-4xl mb-2">{error.message}</div>
                         <div className="text-xl text-red-200 mb-6">{error.timestamp}</div>
@@ -243,18 +278,18 @@ function App() {
                                         <span className="text-lg text-gray-400">{droneConnStatus}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-4 h-4 rounded-full ${droneConnStatus === 'connected' ? 'bg-green-500' :
-                                            droneConnStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                                        <div className={`w-4 h-4 rounded-full ${controllerConnStatus === 'connected' ? 'bg-green-500' :
+                                            controllerConnStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
                                             }`}></div>
                                         <span className="text-lg">Controller - </span>
-                                        <span className="text-lg text-gray-400">{droneConnStatus}</span>
+                                        <span className="text-lg text-gray-400">{controllerConnStatus}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-4 h-4 rounded-full ${droneConnStatus === 'connected' ? 'bg-green-500' :
-                                            droneConnStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                                        <div className={`w-4 h-4 rounded-full ${serverStatus === 'connected' ? 'bg-green-500' :
+                                            serverStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
                                             }`}></div>
                                         <span className="text-lg">Server - </span>
-                                        <span className="text-lg text-gray-400">{droneConnStatus}</span>
+                                        <span className="text-lg text-gray-400">{serverStatus}</span>
                                     </div>
                                 </div>
                                 <div className="text-sm text-gray-400">

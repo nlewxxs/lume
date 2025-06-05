@@ -10,6 +10,7 @@
 #include "sensors.hpp"
 #include "socket.hpp"
 #include "filters.hpp"
+#include "spark_wiring.h"
 #include "spark_wiring_ipaddress.h"
 #include "wlan_hal.h"
 #include <array>
@@ -30,6 +31,7 @@ STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
 
 #define SDA_PIN D1
 #define SCL_PIN D0
+#define BUTTON_PIN D3
 
 #if (PLATFORM_ID == 32)
 // MOSI pin MO
@@ -44,6 +46,12 @@ STARTUP(WiFi.selectAntenna(ANT_EXTERNAL));
 
 // Define the neopixels
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+
+// FUNCTION Button States
+enum ButtonState {
+  IDLE,
+  WAIT_FOR_SECOND_PRESS,
+};
 
 namespace {
 // Keep track of the pitch, roll and yaw as globals in an anonymous namespace
@@ -67,6 +75,20 @@ static unsigned long lastUpdate = 0;
 static constexpr std::array<uint8_t, 3> purple {128, 0, 128};
 static constexpr std::array<uint8_t, 3> cyan {0, 128, 128};
 static constexpr std::array<uint8_t, 3> green {0, 128, 0};
+
+// Timings (adjust as needed)
+static constexpr unsigned long DEBOUNCE_MS = 50;
+static constexpr unsigned long DOUBLE_PRESS_MS = 400;
+static constexpr unsigned long LONG_PRESS_MS = 800;
+
+// Button variables to keep track of button presses and differentiate between
+// single, double, and long presses. 
+static ButtonState state = IDLE;
+static bool lastButtonState = LOW;
+static bool debouncedButtonState = LOW;      // actual debounced value
+static unsigned long lastDebounceTime = 0;
+static unsigned long buttonDownTime = 0;
+static unsigned long lastPressTime = 0;
 }
 
 // Prototypes for local build, ok to leave in for Build IDE
@@ -150,10 +172,17 @@ void setup() {
     Particle.publish("CONTROLLER INITIALISED");
     Log.info("Controller successfully initialised");
 
+    pinMode(BUTTON_PIN, INPUT);
+
+    // update neopixels to signify setup successful
     neopixel_constant(green);
+
+    delay(1000);
 }
 
 void loop() {
+
+    neopixel_constant(cyan);
 
     // We optimistically assume that nothing can go wrong with flex sensors
     // apart from a physical wiring issue
@@ -190,6 +219,44 @@ void loop() {
     } else {
         Log.error("Failed to read from MPU!");
     }
+
+    // Read button - this is 1 if pressed, 0 if not pressed. 
+    bool button = digitalRead(BUTTON_PIN) == HIGH;
+
+    if (button != lastButtonState) {
+        lastDebounceTime = millis();  // reset the debounce timer
+    }
+
+    if ((millis() - lastDebounceTime) > DEBOUNCE_MS) {
+        if (button != debouncedButtonState) {
+            debouncedButtonState = button;
+
+            if (button == HIGH) {
+                buttonDownTime = millis();
+            } else {
+                unsigned long pressDuration = millis() - buttonDownTime;
+
+                if (pressDuration >= LONG_PRESS_MS) {
+                    Log.info("Long press");
+                } else {
+                    if (state == WAIT_FOR_SECOND_PRESS && (millis() - lastPressTime <= DOUBLE_PRESS_MS)) {
+                        Log.info("Double press");
+                        state = IDLE;
+                    } else {
+                        state = WAIT_FOR_SECOND_PRESS;
+                        lastPressTime = millis();
+                    }
+                }
+            }
+        }
+    }
+
+    if (state == WAIT_FOR_SECOND_PRESS && (millis() - lastPressTime > DOUBLE_PRESS_MS)) {
+        Log.info("Single press");
+        state = IDLE;
+    }
+
+    lastButtonState = button;  // update last raw reading
 
     if (millis() - lastUpdate > 5000) {
         Particle.publish("Ping");

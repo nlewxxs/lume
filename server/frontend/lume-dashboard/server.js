@@ -11,30 +11,79 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+let last_controller_status = null;
+let last_drone_status = null;
+
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: Number(process.env.REDIS_PORT),
+  password: process.env.REDIS_PASSWORD || undefined,
+});
+
 const redisPublisher = new Redis({
   host: process.env.REDIS_HOST,
   port: Number(process.env.REDIS_PORT),
   password: process.env.REDIS_PASSWORD || undefined,
 });
+
 const redisSubscriber = new Redis({
   host: process.env.REDIS_HOST,
   port: Number(process.env.REDIS_PORT),
   password: process.env.REDIS_PASSWORD || undefined,
 });
 
-// Subscribe to a Redis channel
+setInterval(async () => {
+    try {
+        const new_controller_status = await redis.get('controller_status');
+        if (new_controller_status !== last_controller_status) {
+            wss.clients.forEach(client => {
+                if (client.readyState === 1) {
+                    console.log("Updating controller status...");
+                    client.send(JSON.stringify({type: 'controller_status', value: new_controller_status}));
+                }
+            });
+
+            last_controller_status = new_controller_status;
+        }
+    } catch (err) {
+        console.log("Redis polling error: ", err);
+    }
+}, 1000); // Poll every second
+
+setInterval(async () => {
+    try {
+        const new_drone_status = await redis.get('drone_status');
+        if (new_drone_status !== last_drone_status) {
+            wss.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    console.log("Updating drone status...");
+                    client.send(JSON.stringify({type: 'drone_status', value: new_drone_status}));
+                }
+            });
+
+            last_drone_status = new_drone_status;
+        }
+    } catch (err) {
+        console.log("Redis polling error: ", err);
+    }
+}, 1000); // Poll every second
+
+
+// Subscribe to ESTOP channel
 redisSubscriber.subscribe('ESTOP');
 
 redisSubscriber.on('message', (channel, message) => {
-  // Broadcast message to all connected WS clients
-  console.log("Express server received ESTOP through ioredis");
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) {
-      console.log("Publishing ESTOP through websocket...");
-      client.send(message);
-    }
-  });
+    // Broadcast message to all connected WS clients
+    console.log("Express server received ESTOP through ioredis");
+    wss.clients.forEach(client => {
+        if (client.readyState === 1) {
+            console.log("Publishing ESTOP through websocket...");
+            // No need to send a value
+            client.send(JSON.stringify({ type: "ESTOP" }));
+        }
+    });
 });
+
 
 wss.on('connection', ws => {
   console.log('✅ WebSocket client connected');
@@ -47,6 +96,7 @@ app.use(express.json());
   // await redisPublisher.publish('my-channel', message);
   // res.json({ success: true });
 // });
+//
 
 server.listen(4000, () => {
   console.log('Server listening on port 4000');

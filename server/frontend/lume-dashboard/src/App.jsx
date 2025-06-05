@@ -35,7 +35,19 @@ function App() {
             };
 
             ws.onmessage = event => {
-                showError("CONTROLLER TRIGGERED ESTOP");
+                const data = JSON.parse(event.data);
+                console.log("Received WS message of type: ", data.type);
+
+                if (data.type === "ESTOP") {
+                    // Trigger ESTOP
+                    showError("CONTROLLER TRIGGERED ESTOP");
+                } else if (data.type == "controller_status") {
+                    // update the controller status on screen
+                    setControllerConnStatus(data.value);
+                } else if (data.type == "drone_status") {
+                    // update the drone status on screen
+                    setDroneConnStatus(data.value);
+                }
             };
 
             ws.onerror = err => {
@@ -61,15 +73,6 @@ function App() {
     useEffect(() => {
         // Set loaded state after a brief delay to ensure CSS is applied
         setTimeout(() => setIsLoaded(true), 100);
-
-        // Simulate Redis connection
-        setControllerConnStatus('connecting');
-
-        setTimeout(() => {
-            setControllerConnStatus('connected');
-            addLog('Connected to Redis server');
-            addLog('Subscribed to "input_data" topic');
-        }, 1000);
 
         // Simulate incoming data on "input_data" topic
         const dataInterval = setInterval(() => {
@@ -264,6 +267,15 @@ function App() {
                 </div>
 
                 <div className="space-y-6">
+                    <div className="bg-gray-800 rounded-lg p-6">
+                        <button
+                            onClick={handleCalibrate}
+                            className="w-full bg-yellow-500 hover:bg-yellow-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                        >
+                            Operation mode: Gesture detection
+                        </button>
+
+                    </div>
                     {/* Metrics Panel */}
                     <div className="space-y-6">
                         <div className="bg-gray-800 rounded-lg p-6">
@@ -299,6 +311,7 @@ function App() {
                         </div>
                     </div>
 
+                    
                     {/* Operation Controls */}
                     <div className="bg-gray-800 rounded-lg p-6">
                         <h2 className="text-xl font-semibold mb-4">Operation Controls</h2>

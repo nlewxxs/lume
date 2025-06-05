@@ -254,9 +254,15 @@ class DataProcessor:
             sensor_data_packet[24] = self.calculate_energy(signals['acc_x'],
                                                            signals['acc_y'],
                                                            signals['acc_z'])
+            if sensor_data_packet[24] > 7300000000.0:
+                self.logger.info("Accelerometer reached detection threshold")
+
             sensor_data_packet[25] = self.calculate_energy(signals['gy_x'],
                                                            signals['gy_y'],
                                                            signals['gy_z'])
+
+            if sensor_data_packet[25] > 2800000.0:
+                self.logger.info("Gyroscope reached detection threshold")
 
             sensor_data_packet[26] = signals['flex0'][0]
             sensor_data_packet[27] = signals['flex1'][0]

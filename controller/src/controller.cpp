@@ -58,6 +58,7 @@ enum FlightState {
     GESTURE_FLIGHT,
     MANUAL_FLIGHT,
     ESTOP,
+    HARDWARE_FAILURE,
 };
 
 namespace {
@@ -86,6 +87,7 @@ static constexpr std::array<uint8_t, 3> purple {108, 0, 255};
 static constexpr std::array<uint8_t, 3> orange {255, 148, 0};
 static constexpr std::array<uint8_t, 3> cyan {0, 128, 128};
 static constexpr std::array<uint8_t, 3> green {0, 128, 0};
+static constexpr std::array<uint8_t, 3> red {128, 0, 0};
 
 // Timings (adjust as needed)
 static constexpr unsigned long DEBOUNCE_MS = 50;
@@ -189,17 +191,24 @@ void setup() {
     neopixel_constant(green);
     delay(2000);
     neopixel_constant(cyan);
+    
+    // set gesture mode
+    socket::SetGestureMode();
 }
 
 void loop() {
 
     // if estop, don't do anything else
     if (flight_state == ESTOP) {
+        // flash the LED
         neopixel_constant(orange);
         delay(1000);
         neopixel_constant({0, 0, 0});
         delay(1000);
         return;
+    } else if (flight_state == HARDWARE_FAILURE) {
+        delay(1000);
+        return; 
     }
 
     // We optimistically assume that nothing can go wrong with flex sensors
@@ -235,7 +244,10 @@ void loop() {
         // Log.info("%f | %f | %f", packet_ptr->pitch, packet_ptr->roll, packet_ptr->yaw);
         // Log.info("%d | %d | %d", packet_ptr->flex0, packet_ptr->flex1, packet_ptr->flex2);
     } else {
+        neopixel_constant(red);
         Log.error("Failed to read from MPU!");
+        socket::SendHardwareFailure();
+        flight_state = HARDWARE_FAILURE;
     }
 
     // Read button - this is 1 if pressed, 0 if not pressed. 
@@ -259,9 +271,11 @@ void loop() {
                     // Use long press to activate direct mode
                     if (flight_state == GESTURE_FLIGHT) {
                         flight_state = MANUAL_FLIGHT;
+                        socket::SetManualMode();
                         neopixel_constant(purple);
                     } else if (flight_state == MANUAL_FLIGHT) {
                         flight_state = GESTURE_FLIGHT;
+                        socket::SetGestureMode();
                         neopixel_constant(cyan);
                     }
                 } else {
@@ -283,6 +297,9 @@ void loop() {
         state = IDLE;
         // Use Single press to activate emergency mode
         flight_state = ESTOP;
+        // send the ESTOP signal 
+        socket::SendESTOP();
+        Log.warn("Sending ESTOP over UDP...");
         return;  // abort
     }
 

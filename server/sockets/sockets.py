@@ -276,8 +276,8 @@ class LumeServer:
 
                     # TODO: shift key is deprecated as of dockerising, this
                     # will be replaced by a redis variable set by the frontend. 
-
-                    if len(values) == config.LUME_SENSOR_PAYLOAD_SIZE:
+                    
+                    if len(values) == 15:
                         if recording or config.LUME_RUN_MODE == "deploy": 
                             self.publish_sensor_data(values)
                     elif len(values) == 1:

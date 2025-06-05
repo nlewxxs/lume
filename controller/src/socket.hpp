@@ -22,6 +22,14 @@ std::variant<IPAddress, ErrorCode> GetServerIP();
 
 std::variant<int, ErrorCode> SendSensorReadings(const filters::DataPacket& data);
 
+void SendESTOP();
+
+void SetManualMode();
+
+void SetGestureMode();
+
+void SendHardwareFailure();
+
 } /* namespace socket */
 
 #endif /* SOCKET_H_ */

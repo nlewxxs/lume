@@ -99,4 +99,32 @@ SendSensorReadings(const filters::DataPacket& data) {
     return SUCCESS;
 }
 
+void SendESTOP() {
+    const uint8_t msg[6] = "LUME0";
+    udp.beginPacket(server_ip.value(), kUdpPort);
+    udp.write(msg, 5); // write in only 5 bytes
+    udp.endPacket();
+}
+
+void SetManualMode() {
+    const uint8_t msg[6] = "LUME1";
+    udp.beginPacket(server_ip.value(), kUdpPort);
+    udp.write(msg, 5); // write in only 5 bytes
+    udp.endPacket();
+}
+
+void SetGestureMode() {
+    const uint8_t msg[6] = "LUME2";
+    udp.beginPacket(server_ip.value(), kUdpPort);
+    udp.write(msg, 5); // write in only 5 bytes
+    udp.endPacket();
+}
+
+void SendHardwareFailure() {
+    const uint8_t msg[6] = "LUME3";
+    udp.beginPacket(server_ip.value(), kUdpPort);
+    udp.write(msg, 5); // write in only 5 bytes
+    udp.endPacket();
+}
+
 } /* namespace socket */

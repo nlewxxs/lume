@@ -3,24 +3,13 @@ import { AlertTriangle, Power, RefreshCw, X, Wifi, WifiOff, Joystick} from 'luci
 
 function App() {
     // State management
-    const [isLoaded, setIsLoaded] = useState(false);
     const [droneConnStatus, setDroneConnStatus] = useState('disconnected');
+    const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString());
+    const [flightMode, setFlightMode] = useState('gesture');
     const [controllerConnStatus, setControllerConnStatus] = useState('disconnected');
-    const [serverStatus, setServerStatus] = useState('disconnected');
-    const [metrics, setMetrics] = useState({
-        temperature: 25.4,
-        pressure: 1013.25,
-        voltage: 12.0,
-        current: 2.3,
-        uptime: '00:15:42',
-        lastUpdate: new Date().toLocaleTimeString()
-    });
     const [warnings, setWarnings] = useState([]);
     const [errors, setErrors] = useState([]);
     const [logs, setLogs] = useState([]);
-
-    // Refs for simulated Redis connection
-    const metricsInterval = useRef(null);
 
     useEffect(() => {
         let ws;
@@ -37,16 +26,35 @@ function App() {
             ws.onmessage = event => {
                 const data = JSON.parse(event.data);
                 console.log("Received WS message of type: ", data.type);
-
+                setLastUpdate(new Date().toLocaleTimeString());
                 if (data.type === "ESTOP") {
-                    // Trigger ESTOP
-                    showError("CONTROLLER TRIGGERED ESTOP");
+                    // Trigger ESTOP if not already in estop
+                    if (flightMode != 'estop') {
+                        setFlightMode('estop');
+                        addLog("Emergency stop triggered");
+                        showError("CONTROLLER TRIGGERED ESTOP");
+                    }
                 } else if (data.type == "controller_status") {
                     // update the controller status on screen
                     setControllerConnStatus(data.value);
+                    if (data.value == "disconnected") {
+                        addLog("Controller disconnected");
+                        showWarning("Controller disconnected.");
+                    } else if (data.value == "hardware_failure") {
+                        addLog("Controller reported hardware failure");
+                        showError("Hardware Failure - Check MPU wiring");
+                    }
                 } else if (data.type == "drone_status") {
                     // update the drone status on screen
                     setDroneConnStatus(data.value);
+                    if (data.value == "disconnected") {
+                        addLog("Drone disconnected");
+                        showWarning("Drone disconnected.");
+                    }
+                } else if (data.type == "flight_mode") {
+                    // update the drone status on screen
+                    addLog(`Flight mode changed to ${data.value}`);
+                    setFlightMode(data.value);
                 }
             };
 
@@ -65,49 +73,6 @@ function App() {
         return () => {
             clearTimeout(retryTimeout);
             if (ws) ws.close();
-        };
-    }, []);
-
-
-    // Simulated Redis connection and subscription
-    useEffect(() => {
-        // Set loaded state after a brief delay to ensure CSS is applied
-        setTimeout(() => setIsLoaded(true), 100);
-
-        // Simulate incoming data on "input_data" topic
-        const dataInterval = setInterval(() => {
-            if (Math.random() > 0.8) { // 20% chance of receiving data
-                const mockData = {
-                    sensor_id: Math.floor(Math.random() * 5) + 1,
-                    value: (Math.random() * 100).toFixed(2),
-                    timestamp: new Date().toISOString()
-                };
-                addLog(`Received on input_data: ${JSON.stringify(mockData)}`);
-
-                // Simulate warning conditions
-                if (parseFloat(mockData.value) > 85) {
-                    showWarning(`High sensor value detected: ${mockData.value}`);
-                }
-            }
-        }, 3000);
-
-        // Update metrics periodically
-        metricsInterval.current = setInterval(() => {
-            setMetrics(prev => ({
-                ...prev,
-                temperature: (25 + Math.random() * 10).toFixed(1),
-                pressure: (1010 + Math.random() * 10).toFixed(2),
-                voltage: (11.8 + Math.random() * 0.4).toFixed(1),
-                current: (2.0 + Math.random() * 0.6).toFixed(1),
-                lastUpdate: new Date().toLocaleTimeString()
-            }));
-        }, 2000);
-
-        return () => {
-            clearInterval(dataInterval);
-            if (metricsInterval.current) {
-                clearInterval(metricsInterval.current);
-            }
         };
     }, []);
 
@@ -164,7 +129,7 @@ function App() {
     const handleEmergencyStop = () => {
         publishToRedis({ command: 'emergency_stop' });
         addLog('EMERGENCY STOP activated');
-        showError('YOU MESSED UP BAD')
+        showError('Triggered server side')
     };
 
     const handleReset = () => {
@@ -177,6 +142,16 @@ function App() {
         addLog('Sensor calibration initiated');
     };
 
+    const toggleFlightMode = () => {
+        if (flightMode !== 'estop') {
+            if (flightMode === 'gesture') {
+                setFlightMode('manual');
+            } else {
+                setFlightMode('gesture');
+            }
+        }
+    };
+
     const dismissWarning = (warningId) => {
         setWarnings(prev => prev.filter(w => w.id !== warningId));
     };
@@ -186,7 +161,7 @@ function App() {
     };
 
     return (
-        <div className={`min-h-screen bg-gray-900 text-white p-6 transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`min-h-screen bg-gray-900 text-white p-6`}>
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2">LUME</h1>
@@ -269,12 +244,11 @@ function App() {
                 <div className="space-y-6">
                     <div className="bg-gray-800 rounded-lg p-6">
                         <button
-                            onClick={handleCalibrate}
-                            className="w-full bg-yellow-500 hover:bg-yellow-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            onClick={toggleFlightMode}
+                            className={`w-full ${flightMode === 'gesture' ? 'bg-cyan-500' : 'bg-purple-500'} ${flightMode === 'gesture' ? 'hover:bg-cyan-700' : 'hover:bg-purple-700'} text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors`}
                         >
-                            Operation mode: Gesture detection
+                            Operation mode: {flightMode === 'gesture' ? 'Gesture detection' : 'Manual control'}
                         </button>
-
                     </div>
                     {/* Metrics Panel */}
                     <div className="space-y-6">
@@ -296,16 +270,9 @@ function App() {
                                         <span className="text-lg">Controller - </span>
                                         <span className="text-lg text-gray-400">{controllerConnStatus}</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-4 h-4 rounded-full ${serverStatus === 'connected' ? 'bg-green-500' :
-                                            serverStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                                            }`}></div>
-                                        <span className="text-lg">Server - </span>
-                                        <span className="text-lg text-gray-400">{serverStatus}</span>
-                                    </div>
                                 </div>
                                 <div className="text-sm text-gray-400">
-                                    Last Update: {metrics.lastUpdate}
+                                    Last Update: {lastUpdate}
                                 </div>
                             </div>
                         </div>

@@ -13,6 +13,7 @@ const wss = new WebSocketServer({ server });
 
 let last_controller_status = null;
 let last_drone_status = null;
+let last_flight_mode = null;
 
 const redis = new Redis({
   host: process.env.REDIS_HOST,
@@ -55,7 +56,7 @@ setInterval(async () => {
         const new_drone_status = await redis.get('drone_status');
         if (new_drone_status !== last_drone_status) {
             wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
+                if (client.readyState === 1) {
                     console.log("Updating drone status...");
                     client.send(JSON.stringify({type: 'drone_status', value: new_drone_status}));
                 }
@@ -67,6 +68,24 @@ setInterval(async () => {
         console.log("Redis polling error: ", err);
     }
 }, 1000); // Poll every second
+
+setInterval(async () => {
+    try {
+        const new_flight_mode = await redis.get('flight_mode');
+        if (new_flight_mode !== last_flight_mode) {
+            wss.clients.forEach(client => {
+                if (client.readyState === 1) {
+                    console.log("Updating drone status...");
+                    client.send(JSON.stringify({type: 'flight_mode', value: new_flight_mode}));
+                }
+            });
+
+            last_flight_mode = new_flight_mode;
+        }
+    } catch (err) {
+        console.log("Redis polling error: ", err);
+    }
+}, 200); // Poll 5 times every second
 
 
 // Subscribe to ESTOP channel
@@ -90,13 +109,6 @@ wss.on('connection', ws => {
 });
 
 app.use(express.json());
-
-// app.post('/api/publish', async (req, res) => {
-  // const { message } = req.body;
-  // await redisPublisher.publish('my-channel', message);
-  // res.json({ success: true });
-// });
-//
 
 server.listen(4000, () => {
   console.log('Server listening on port 4000');

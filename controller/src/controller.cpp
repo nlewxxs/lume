@@ -49,11 +49,20 @@ Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // FUNCTION Button States
 enum ButtonState {
-  IDLE,
-  WAIT_FOR_SECOND_PRESS,
+    IDLE,
+    WAIT_FOR_SECOND_PRESS,
+};
+
+// System flight states
+enum FlightState {
+    GESTURE_FLIGHT,
+    MANUAL_FLIGHT,
+    ESTOP,
 };
 
 namespace {
+static FlightState flight_state = GESTURE_FLIGHT;
+
 // Keep track of the pitch, roll and yaw as globals in an anonymous namespace
 static float pitch;
 static float roll;
@@ -72,7 +81,9 @@ static int32_t flex2; // ring
 static unsigned long lastUpdate = 0;
 
 // Define colours
-static constexpr std::array<uint8_t, 3> purple {128, 0, 128};
+static constexpr std::array<uint8_t, 3> magenta {128, 0, 128};
+static constexpr std::array<uint8_t, 3> purple {108, 0, 255};
+static constexpr std::array<uint8_t, 3> orange {255, 148, 0};
 static constexpr std::array<uint8_t, 3> cyan {0, 128, 128};
 static constexpr std::array<uint8_t, 3> green {0, 128, 0};
 
@@ -147,7 +158,7 @@ void setup() {
     conn_res = socket::ListenForServerConn();
 
     while (!std::holds_alternative<int>(conn_res)) {
-        loading(purple);
+        loading(magenta);
         Log.error("Failed to connect to server!");
         conn_res = socket::ListenForServerConn();
         delay(500);
@@ -161,7 +172,7 @@ void setup() {
 
     while (!std::holds_alternative<IPAddress>(ip)) {
         // bueno
-        loading(purple);
+        loading(magenta);
         Log.error("Failed to obtain server IP!");
         ip = socket::GetServerIP();
     }
@@ -176,13 +187,20 @@ void setup() {
 
     // update neopixels to signify setup successful
     neopixel_constant(green);
-
-    delay(1000);
+    delay(2000);
+    neopixel_constant(cyan);
 }
 
 void loop() {
 
-    neopixel_constant(cyan);
+    // if estop, don't do anything else
+    if (flight_state == ESTOP) {
+        neopixel_constant(orange);
+        delay(1000);
+        neopixel_constant({0, 0, 0});
+        delay(1000);
+        return;
+    }
 
     // We optimistically assume that nothing can go wrong with flex sensors
     // apart from a physical wiring issue
@@ -238,6 +256,14 @@ void loop() {
 
                 if (pressDuration >= LONG_PRESS_MS) {
                     Log.info("Long press");
+                    // Use long press to activate direct mode
+                    if (flight_state == GESTURE_FLIGHT) {
+                        flight_state = MANUAL_FLIGHT;
+                        neopixel_constant(purple);
+                    } else if (flight_state == MANUAL_FLIGHT) {
+                        flight_state = GESTURE_FLIGHT;
+                        neopixel_constant(cyan);
+                    }
                 } else {
                     if (state == WAIT_FOR_SECOND_PRESS && (millis() - lastPressTime <= DOUBLE_PRESS_MS)) {
                         Log.info("Double press");
@@ -253,7 +279,11 @@ void loop() {
 
     if (state == WAIT_FOR_SECOND_PRESS && (millis() - lastPressTime > DOUBLE_PRESS_MS)) {
         Log.info("Single press");
+        Log.warn("EMERGENCY STOP ACTIVATED");
         state = IDLE;
+        // Use Single press to activate emergency mode
+        flight_state = ESTOP;
+        return;  // abort
     }
 
     lastButtonState = button;  // update last raw reading

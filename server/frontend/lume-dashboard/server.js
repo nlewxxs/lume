@@ -97,8 +97,8 @@ redisSubscriber.on('message', (channel, message) => {
     wss.clients.forEach(client => {
         if (client.readyState === 1) {
             console.log("Publishing ESTOP through websocket...");
-            // No need to send a value
-            client.send(JSON.stringify({ type: "ESTOP" }));
+            // forward the value
+            client.send(JSON.stringify({ type: "ESTOP", value: {message} }));
         }
     });
 });

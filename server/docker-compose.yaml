@@ -44,6 +44,8 @@ services:
       - LUME_RUN_MODE=${LUME_RUN_MODE}
       - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
       - LUME_VERBOSE=${LUME_VERBOSE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   db:
     depends_on: [redis]

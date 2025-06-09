@@ -211,7 +211,7 @@ class LumeServer:
         elif control_code == 3:  # Indicate a hardware failure
             # Note that if the system reaches this state, it cannot escape it
             # without a restart that can be triggered in the frontend. 
-            self.redisconn.set("controller_status", "hardware_failure")
+            self.redisconn.publish("ESTOP", "HARDWARE_FAILURE")
 
     def run(self, device_ip: str, polling_interval: float = 2.0):
         """Run the UDP server main loop.

@@ -29,10 +29,16 @@ function App() {
                 setLastUpdate(new Date().toLocaleTimeString());
                 if (data.type === "ESTOP") {
                     // Trigger ESTOP if not already in estop
-                    if (flightMode != 'estop') {
-                        setFlightMode('estop');
-                        addLog("Emergency stop triggered");
-                        showError("CONTROLLER TRIGGERED ESTOP");
+                    if (data.value == "ESTOP") {
+                        if (flightMode != 'estop') {
+                            setFlightMode('estop');
+                            addLog("Emergency stop triggered");
+                            showError("CONTROLLER TRIGGERED ESTOP");
+                        }
+                    } else {
+                        // hardware failure
+                        addLog("Controller reported hardware failure");
+                        showError("HARDWARE FAILURE");
                     }
                 } else if (data.type == "controller_status") {
                     // update the controller status on screen
@@ -40,9 +46,6 @@ function App() {
                     if (data.value == "disconnected") {
                         addLog("Controller disconnected");
                         showWarning("Controller disconnected.");
-                    } else if (data.value == "hardware_failure") {
-                        addLog("Controller reported hardware failure");
-                        showError("Hardware Failure - Check MPU wiring");
                     }
                 } else if (data.type == "drone_status") {
                     // update the drone status on screen

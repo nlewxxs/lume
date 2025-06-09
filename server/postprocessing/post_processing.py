@@ -254,15 +254,15 @@ class DataProcessor:
             sensor_data_packet[24] = self.calculate_energy(signals['acc_x'],
                                                            signals['acc_y'],
                                                            signals['acc_z'])
-            if sensor_data_packet[24] > 7300000000.0:
-                self.logger.info("Accelerometer reached detection threshold")
+            if sensor_data_packet[24] > 8300000000.0:
+                self.redisconn.publish("detection_threshold", "accelerometer");
 
             sensor_data_packet[25] = self.calculate_energy(signals['gy_x'],
                                                            signals['gy_y'],
                                                            signals['gy_z'])
 
-            if sensor_data_packet[25] > 2800000.0:
-                self.logger.info("Gyroscope reached detection threshold")
+            if sensor_data_packet[25] > 3500000.0:
+                self.redisconn.publish("detection_threshold", "gyroscope");
 
             sensor_data_packet[26] = signals['flex0'][0]
             sensor_data_packet[27] = signals['flex1'][0]
@@ -272,7 +272,8 @@ class DataProcessor:
             packed = pack_binary(sensor_data_packet)
 
             # Publish data window onto sensors channel
-            self.redisconn.publish('sensors', packed)
+            self.redisconn.lpush('sensors', packed)
+            self.redisconn.ltrim('sensors', 0, 200)
 
             # Update hash to signify that we have processed this batch
             self.last_hash = hash  

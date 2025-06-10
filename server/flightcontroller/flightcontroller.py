@@ -11,6 +11,11 @@ from djitellopy import Tello
 
 from shared.lume_logger import *
 from shared.config import config
+from shared.packer import unpack_binary
+
+PITCH_SIGNIFICANT_DELTA = 2.0
+ROLL_SIGNIFICANT_DELTA = 2.0
+YAW_SIGNIFICANT_DELTA = 2.0
 
 class FlightController:
     def __init__(self, redisconn: redis.client.Redis, verbose: bool = False) -> None:
@@ -24,7 +29,7 @@ class FlightController:
         self.flight_mode = "gesture"
     
     def connect(self):
-        """Connect to the DJI Tello Edu"""
+        """Connect to the DJI Tello"""
         try:
             self.drone.connect()
             self.logger.warning("Connected to DJI tello drone")
@@ -61,6 +66,24 @@ class FlightController:
         """Update the pitch, roll and yaw thresholds for manual mode"""
         self.logger.info("Setting YPR thresholds for manual control")
 
+        try:
+            base_readings = self.sensors_sub.get_message(ignore_subscribe_messages=True, timeout=0.1)
+            if base_readings:
+                unpacked = unpack_binary(base_readings['data'])
+                base_pitch = unpacked['pitch']
+                base_roll = unpacked['roll']
+                base_yaw = unpacked['yaw']
+
+                self.pitch_thresholds = (base_pitch - PITCH_SIGNIFICANT_DELTA, base_pitch + PITCH_SIGNIFICANT_DELTA)
+                self.roll_thresholds = (base_roll - ROLL_SIGNIFICANT_DELTA, base_roll + ROLL_SIGNIFICANT_DELTA)
+                self.yaw_thresholds = (base_yaw - YAW_SIGNIFICANT_DELTA, base_yaw + YAW_SIGNIFICANT_DELTA)
+
+                self.logger.info(f"YPR thresholds set to: {self.pitch_thresholds}, {self.roll_thresholds}, {self.yaw_thresholds}")
+            else:
+                self.logger.error("No sensor readings found to set YPR thresholds")
+        except Exception as e:
+            self.logger.error(f"Error calibrating YPR readings for manual mode: {e}")
+
     def run(self): 
         """
         Control the drone
@@ -79,6 +102,11 @@ class FlightController:
         # Create a subscription to the takeoff / land channel that is published to 
         takeoff_land_sub = self.redisconn.pubsub()
         takeoff_land_sub.subscribe("remote_takeoff_land")
+
+        # Grab one batch of sensor readings
+        self.sensors_sub = self.redisconn.pubsub()
+        self.sensors_sub.subscribe('sensors')
+
 
         while True:
             # If emergency stop, land immediately
@@ -112,10 +140,34 @@ class FlightController:
                 ...
 
             elif self.flight_mode == "manual":
-                # If we have just entered manual mode, then we need to calibrate the current position of the controller
+                # If we have just entered manual mode, then we need to
+                # calibrate the current position of the controller
                 if old_flight_mode != "manual": 
                     self.set_ypr_thresholds()
-                ...
+
+                # Otherwise, just regularly read the sensor data and send the
+                # corresponding commands based on YPR thresholds
+                sensors = self.sensors_sub.get_message(ignore_subscribe_messages=True, timeout=0.1)
+
+                if sensors:
+                    unpacked = unpack_binary(sensors['data'])
+
+                    if unpacked['pitch'] < self.pitch_thresholds[0]:
+                        self.logger.info("left")
+                    elif unpacked['pitch'] > self.pitch_thresholds[1]:
+                        self.logger.info("right")
+                
+
+                    if unpacked['roll'] < self.roll_thresholds[0]:
+                        self.logger.info("forward")
+                    elif unpacked['roll'] > self.roll_thresholds[1]:
+                        self.logger.info("back")
+
+
+                    if unpacked['yaw'] < self.yaw_thresholds[0]:
+                        self.logger.info("pan left")
+                    elif unpacked['yaw'] > self.yaw_thresholds[1]:
+                        self.logger.info("pan right")
 
 
             elif self.flight_mode == "remote_override":
@@ -130,7 +182,6 @@ class FlightController:
 
                 if move_cmd:
                     print(move_cmd)
-
 
             else:
                 self.logger.error(f"Undefined control state {self.flight_mode} encountered! Escalating to ESTOP to prevent undefined behaviour")

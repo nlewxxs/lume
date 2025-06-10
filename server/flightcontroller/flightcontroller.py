@@ -59,8 +59,7 @@ class FlightController:
 
     def set_ypr_thresholds(self):
         """Update the pitch, roll and yaw thresholds for manual mode"""
-        ...
-        
+        self.logger.info("Setting YPR thresholds for manual control")
 
     def run(self): 
         """
@@ -70,11 +69,16 @@ class FlightController:
 
         GESTURE_CONTROL: Recognise gestures and send pre-defined commands to the drone.
         MANUAL_CONTROL: Control the drone based on the pitch, roll and yaw difference of the controller
-        REMOTE_OVERRIDE: Control the drone using the arrow keys on the arrow keys and C / V / SPACE
+        REMOTE_OVERRIDE: Control the drone using the arrow keys on the arrow keys and ] / # / T / L 
         ESTOP: Land immediately as soon as this is triggered. 
         """
 
         self.logger.info("Spinning up Flight Controller run loop...")
+        self.redisconn.set('flight_mode', 'gesture')  # init flight mode
+        
+        # Create a subscription to the takeoff / land channel that is published to 
+        takeoff_land_sub = self.redisconn.pubsub()
+        takeoff_land_sub.subscribe("remote_takeoff_land")
 
         while True:
             # If emergency stop, land immediately
@@ -85,17 +89,24 @@ class FlightController:
                 else:
                     self.logger.warning("ESTOP triggered but drone is not connected. Program will continue to attempt connection and land immediately.")
 
+            # TODO: put back in when drone fixed
             # Attempt connection if not connected 
-            if not self.connected:
-                self.connect()
-                time.sleep(3)  # Retry every 3 seconds
-                continue
+            # if not self.connected:
+                # self.connect()
+                # time.sleep(3)  # Retry every 3 seconds
+                # continue
 
             # Update the flight mode by reading the redis variable. Also store
             # the old flight mode so we can trigger events on switching between
             # different modes
             old_flight_mode = self.flight_mode
             self.flight_mode = self.redisconn.get("flight_mode")
+
+            self.flight_mode = self.flight_mode.decode('utf-8') if isinstance(self.flight_mode, bytes) else self.flight_mode
+            
+            # Log any changes
+            if old_flight_mode != self.flight_mode:
+                self.logger.info(f"Flight mode has been changed to: {self.flight_mode}")
 
             if self.flight_mode == "gesture":
                 ...
@@ -108,11 +119,24 @@ class FlightController:
 
 
             elif self.flight_mode == "remote_override":
-                ...
+                # First check for any commands on the takeoff / land channel
+                takeoff_cmd = takeoff_land_sub.get_message(ignore_subscribe_messages=True, timeout=0.01)
+                if takeoff_cmd:
+                    print(takeoff_cmd)
+
+                # Then, get the current command from the remote_command variable
+                move_cmd = self.redisconn.get("remote_command")
+                move_cmd = move_cmd.decode('utf-8') if isinstance(move_cmd, bytes) else move_cmd
+
+                if move_cmd:
+                    print(move_cmd)
+
 
             else:
-                self.logger.error("Undefined control state encountered! Escalating to ESTOP to prevent undefined behaviour")
+                self.logger.error(f"Undefined control state {self.flight_mode} encountered! Escalating to ESTOP to prevent undefined behaviour")
                 self.estop = True
+            
+            old_flight_mode = self.flight_mode
 
 
 if __name__ == "__main__":

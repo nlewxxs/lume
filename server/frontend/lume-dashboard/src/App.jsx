@@ -10,20 +10,56 @@ function App() {
     const [warnings, setWarnings] = useState([]);
     const [errors, setErrors] = useState([]);
     const [logs, setLogs] = useState([]);
+    const [key, setKey] = useState(null);
+    const ws = useRef(null);
+    const flightModeRef = useRef(flightMode);
 
     useEffect(() => {
-        let ws;
+        flightModeRef.current = flightMode;
+        const handleKeyDown = (event) => {
+            setKey(event.key);
+            console.log(`Key pressed: ${event.key}`);
+            if (ws) {
+                if (ws.current.readyState === 1 && flightModeRef.current == "remote_override") {
+                    sendToServer({type: "keypress", value: event.key});
+                }
+            }
+        };
+
+        const handleKeyUp = (event) => {
+            setKey(null);
+            console.log(`Key unpressed: ${event.key}`);
+            if (ws) {
+                if (ws.current.readyState === 1 && flightModeRef.current == "remote_override") {
+                    console.log(flightMode);
+                    sendToServer({type: "keyunpress", value: event.key});
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        // cleanup
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+
+    }, [flightMode]);
+
+    useEffect(() => {
         let retryTimeout;
 
         const connectWebSocket = () => {
             console.log("Attempting to initialise websocket connection");
-            ws = new WebSocket(`ws://${window.location.hostname}:4000`);
+            ws.current = new WebSocket(`ws://${window.location.hostname}:4000`);
 
-            ws.onopen = () => {
+            ws.current.onopen = () => {
                 console.log('✅ WebSocket connected');
             };
 
-            ws.onmessage = event => {
+            ws.current.onmessage = event => {
                 const data = JSON.parse(event.data);
                 console.log("Received WS message of type: ", data.type);
                 setLastUpdate(new Date().toLocaleTimeString());
@@ -61,11 +97,11 @@ function App() {
                 }
             };
 
-            ws.onerror = err => {
+            ws.current.onerror = err => {
                 console.error('❌ WebSocket error:', err);
             };
 
-            ws.onclose = () => {
+            ws.current.onclose = () => {
                 console.warn('⚠️ WebSocket closed, retrying in 1s...');
                 retryTimeout = setTimeout(connectWebSocket, 1000);
             };
@@ -75,14 +111,21 @@ function App() {
 
         return () => {
             clearTimeout(retryTimeout);
-            if (ws) ws.close();
+            if (ws.current) ws.current.close();
         };
     }, []);
+    
+    const sendToServer = (msg) => {
+        if (ws.current.readyState === 1) {
+            console.log(`Sending ${msg.type}, ${msg.value} to server`);
+            ws.current.send(JSON.stringify(msg));
+        }
+    };
 
     // Utility functions
     const addLog = (message) => {
         const timestamp = new Date().toLocaleTimeString();
-        setLogs(prev => [...prev.slice(-9), `[${timestamp}] ${message}`]);
+        setLogs(prev => [`[${timestamp}] ${message}`, ...prev.slice(-19)]);
     };
 
     const showWarning = (message) => {
@@ -108,7 +151,6 @@ function App() {
         setErrors(prev => [...prev, error]);
     };
 
-
     const publishToRedis = (data) => {
         const payload = {
             data,
@@ -131,8 +173,8 @@ function App() {
 
     const handleEmergencyStop = () => {
         publishToRedis({ command: 'emergency_stop' });
-        addLog('EMERGENCY STOP activated');
-        showError('Triggered server side')
+        addLog('EMERGENCY STOP activated on server side');
+        showError('ESTOP triggered server side')
     };
 
     const handleReset = () => {
@@ -140,17 +182,26 @@ function App() {
         addLog('System reset command sent');
     };
 
-    const handleCalibrate = () => {
-        publishToRedis({ command: 'calibrate_sensors' });
-        addLog('Sensor calibration initiated');
+    const toggleRemoteOverride = () => {
+        if (flightMode != "remote_override") {
+            addLog('Remote override activated');
+            setFlightMode('remote_override');
+            sendToServer({type: 'flight_mode', value: 'remote_override'});
+        } else {
+            addLog('Remote override deactivated');
+            setFlightMode('gesture');
+            sendToServer({type: 'flight_mode', value: 'gesture'});
+        }
     };
 
     const toggleFlightMode = () => {
         if (flightMode !== 'estop') {
             if (flightMode === 'gesture') {
                 setFlightMode('manual');
+                sendToServer({type: 'flight_mode', value: 'manual'});
             } else {
                 setFlightMode('gesture');
+                sendToServer({type: 'flight_mode', value: 'gesture'});
             }
         }
     };
@@ -162,6 +213,43 @@ function App() {
     const dismissError = (errorId) => {
         setErrors(prev => prev.filter(w => w.id !== errorId));
     };
+
+    function RemoteOverride() {
+        if (flightMode == 'remote_override') {
+            return <div
+                className="fixed left-20 right-180 top-50 bottom-50 z-50 rounded-3xl border-4 border-red-500 flex items-center justify-center bg-[rgba(255,128,0,0.9)] text-white p-8"
+            >
+                <div className="text-center max-w-3xl">
+                    <div className="text-6xl font-extrabold mb-4 flex justify-center items-center gap-4 w-full whitespace-nowrap">
+                        REMOTE OVERRIDE ACTIVE
+                    </div>
+                    <div className="flex justify-center items-center gap-4">
+                        <div className="text-2xl mb-4 flex justify-center items-center gap-4">
+                            Use the arrow keys and ']', '#' to control the drone. Press T to takeoff and L to land.
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={toggleRemoteOverride}
+                        className="mt-4 px-6 py-3 bg-white text-red-700 text-xl font-bold rounded-lg hover:bg-red-100 transition"
+                    >
+                        Disable
+                    </button>
+                </div>
+            </div>
+        }
+    }
+
+    function FlightModeButton() {
+        if (flightMode != 'remote_override') {
+            return <button
+                onClick={toggleFlightMode}
+                className={`w-full ${flightMode === 'gesture' ? 'bg-cyan-500' : 'bg-purple-500'} ${flightMode === 'gesture' ? 'hover:bg-cyan-700' : 'hover:bg-purple-700'} text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors`}
+            >
+                Operation mode: {flightMode === 'gesture' ? 'Gesture detection' : 'Manual control'}
+            </button>
+        }
+    }
 
     return (
         <div className={`min-h-screen bg-gray-900 text-white p-6`}>
@@ -198,6 +286,7 @@ function App() {
                 </div>
             ))}
 
+            <RemoteOverride/>
 
             {/* Critical Error Popups */}
             {errors.map(error => (
@@ -221,6 +310,7 @@ function App() {
                     </div>
                 </div>
             ))}
+            
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Control Panel */}
@@ -246,12 +336,7 @@ function App() {
 
                 <div className="space-y-6">
                     <div className="bg-gray-800 rounded-lg p-6">
-                        <button
-                            onClick={toggleFlightMode}
-                            className={`w-full ${flightMode === 'gesture' ? 'bg-cyan-500' : 'bg-purple-500'} ${flightMode === 'gesture' ? 'hover:bg-cyan-700' : 'hover:bg-purple-700'} text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors`}
-                        >
-                            Operation mode: {flightMode === 'gesture' ? 'Gesture detection' : 'Manual control'}
-                        </button>
+                        <FlightModeButton />
                     </div>
                     {/* Metrics Panel */}
                     <div className="space-y-6">
@@ -315,11 +400,11 @@ function App() {
                                 Reset
                             </button>
                             <button
-                                onClick={handleCalibrate}
-                                className="col-span-2 bg-yellow-500 hover:bg-yellow-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                onClick={toggleRemoteOverride}
+                                className="col-span-2 bg-orange-500 hover:bg-orange-700 text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
                             >
                                 <Joystick className="w-5 h-5" />
-                                Manual Override
+                                Remote Override
                             </button>
                         </div>
                     </div>

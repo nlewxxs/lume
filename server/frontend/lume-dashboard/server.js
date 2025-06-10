@@ -75,7 +75,7 @@ setInterval(async () => {
         if (new_flight_mode !== last_flight_mode) {
             wss.clients.forEach(client => {
                 if (client.readyState === 1) {
-                    console.log("Updating drone status...");
+                    console.log("Updating flight mode status...");
                     client.send(JSON.stringify({type: 'flight_mode', value: new_flight_mode}));
                 }
             });
@@ -105,8 +105,40 @@ redisSubscriber.on('message', (channel, message) => {
 
 
 wss.on('connection', ws => {
-  console.log('✅ WebSocket client connected');
+    console.log('✅ WebSocket client connected');
+    ws.on('message', (msg) => {
+        let message = JSON.parse(msg);
+        console.log("Received message from frontend:", message);
+        if (message.type == "flight_mode") {
+            console.log('Received flight mode update');
+            redis.set('flight_mode', message.value);
+        } else if (message.type == "keypress") {
+            if (message.value == "ArrowLeft") {
+                redis.set('remote_command', 'left');
+            } else if (message.value == "ArrowRight") {
+                redis.set('remote_command', 'right');
+            } else if (message.value == "ArrowUp") {
+                redis.set('remote_command', 'forward');
+            } else if (message.value == "ArrowDown") {
+                redis.set('remote_command', 'back');
+            } else if (message.value == "]") {
+                redis.set('remote_command', 'up');
+            } else if (message.value == "#") {
+                redis.set('remote_command', 'down');
+            } else if (message.value == "t" || message.value == "T") {
+                redisPublisher.publish('remote_takeoff_land', "takeoff");
+            } else if (message.value == "l" || message.value == "L") {
+                redisPublisher.publish('remote_takeoff_land', "land");
+            }
+        } else if (message.type == "keyunpress") {
+            // clear the remote command
+            redis.set('remote_command', '');
+        } else {
+            console.error("Error: Unknown message type received in websocket!")
+        }
+    });
 });
+
 
 app.use(express.json());
 

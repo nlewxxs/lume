@@ -76,6 +76,22 @@ services:
       - "5173:5173"
       - "4000:4000"
 
+  flightcontroller:
+    depends_on: [redis]
+    build: 
+      context: .
+      dockerfile: flightcontroller/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - LUME_RUN_MODE=${LUME_RUN_MODE}
+      - LUME_CONTROLLER_IP=${LUME_CONTROLLER_IP}
+      - LUME_VERBOSE=${LUME_VERBOSE}
+    ports:
+      - "8889:8889"
+      - "8890:8890"
+
+
 # networks:
   # mybridge:
     # driver: bridge
